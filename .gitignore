@@ -1,0 +1,20 @@
+# Local config with personal file paths (use config.example.ini as a template)
+config.ini
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Database (personal financial data — never commit)
+*.db
+
+# Frontend
+node_modules/
+frontend/dist/
+*.db-journal
+*.db.bak*
+
+# Local data folder: SQLite DB + originals of uploaded files (private — never commit)
+backend/data/
