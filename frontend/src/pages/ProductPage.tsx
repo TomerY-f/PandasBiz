@@ -348,6 +348,14 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
       }, [])
   }, [filtered, product])
   const total = filtered.reduce((s, t) => s + t.amount, 0) * sign
+  // which slice of time the charts and the table show, in words
+  const scopeText = [
+    month ? (periodType === 'cycle' ? `מחזור חיוב ${cycleLabel(month)}` : `חודש ${month}`) : 'כל התקופה',
+    dateFrom || dateTo ? `תאריכים ${dateFrom || '…'} – ${dateTo || '…'}` : '',
+    account ? `חשבון ${account}` : '',
+    category ? `שורה: ${category}` : '',
+    minAmount || maxAmount ? `סכום ${minAmount || 0} – ${maxAmount || '∞'}` : '',
+  ].filter(Boolean).join(' · ') + ` · ${filtered.length} תנועות`
 
   const setCat = async (t: Tx, value: string) => {
     t.category = value === '__auto' ? t.category : value  // show the choice at once; the reload confirms it
@@ -387,7 +395,8 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
       <div className="grid grid-2">
         {byCategory.length > 0 && (
           <div className="card">
-            <h2>התפלגות לפי שורת תקציב</h2>
+            <h2 style={{ marginBottom: 2 }}>התפלגות לפי שורת תקציב</h2>
+            <p className="muted" style={{ margin: '0 0 6px' }}>{scopeText} · לפי הסינון בטבלת התנועות</p>
             <ResponsiveContainer width="100%" height={400}>
               <PieChart>
                 <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={55} outerRadius={115} paddingAngle={2}
