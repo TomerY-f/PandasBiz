@@ -261,11 +261,21 @@ const short = (n: string) => {
 }
 
 // pie slice label: line name, amount and share, sized to stay readable
-function PieLabel(props: { x?: number; y?: number; textAnchor?: "inherit" | "middle" | "start" | "end"; name?: string; value?: number; percent?: number; fill?: string }) {
-  const { x = 0, y = 0, textAnchor = 'middle', name, value, percent, fill } = props
+const signedILS = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtILS(Math.abs(v))}`
+
+function PieLabel(props: {
+  x?: number; y?: number; textAnchor?: 'inherit' | 'middle' | 'start' | 'end'; name?: string; value?: number; percent?: number
+  fill?: string; payload?: { signed?: number; showSign?: boolean }
+}) {
+  const { x = 0, y = 0, textAnchor = 'middle', name, value, percent, fill, payload } = props
+  if ((percent ?? 0) < 0.03) return null  // tiny slices: the label would overlap its neighbours; hover shows it
+  // on bank pages, money in is "+" in green and money out is "−" in red, like the table below
+  const signed = payload?.showSign ? payload.signed ?? 0 : null
+  const amount = signed == null ? fmtILS(Number(value)) : signedILS(signed)
+  const color = signed == null ? fill : signed >= 0 ? '#00a37a' : '#d63031'
   return (
-    <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={14} fontWeight={600} fill={fill}>
-      {`${short(name ?? '')}: ${fmtILS(Number(value))} (${Math.round((percent ?? 0) * 100)}%)`}
+    <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={14} fontWeight={600} fill={color}>
+      {`${short(name ?? '')}: ${amount} (${Math.round((percent ?? 0) * 100)}%)`}
     </text>
   )
 }
@@ -337,16 +347,23 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
       if (t.category === 'העברה פנימית') return
       m.set(t.category, (m.get(t.category) ?? 0) + (product === 'credit_card' ? -t.amount : t.amount))
     })
-    return Array.from(m.entries())
-      .map(([name, value]) => ({ name, value: Math.round(Math.abs(value)) }))
+    // slice size is the absolute amount; `signed` keeps the direction (+ income / − expense) for labels
+    const items = Array.from(m.entries())
+      .map(([name, v]) => ({ name, value: Math.round(Math.abs(v)), signed: Math.round(v), showSign: product !== 'credit_card' }))
       .sort((a, b) => b.value - a.value)
-      .reduce<{ name: string; value: number }[]>((acc, item, i) => {
-        if (i < 8) acc.push(item)
-        else if (acc.length === 8) acc.push({ name: 'אחר', value: item.value })
-        else acc[8].value += item.value
-        return acc
-      }, [])
+    const top = items.slice(0, 8)
+    const rest = items.slice(8)
+    for (const dir of [1, -1]) {
+      const group = rest.filter((x) => (product === 'credit_card' ? dir === 1 : Math.sign(x.signed || 1) === dir))
+      if (!group.length) continue
+      const signed = group.reduce((acc, x) => acc + x.signed, 0)
+      const label = product === 'credit_card' ? 'אחר' : dir === 1 ? 'אחר (הכנסות)' : 'אחר (הוצאות)'
+      top.push({ name: label, value: Math.abs(signed), signed, showSign: product !== 'credit_card' })
+    }
+    return top
   }, [filtered, product])
+  const pieIncome = byCategory.filter((x) => x.signed > 0).reduce((a, x) => a + x.signed, 0)
+  const pieExpense = byCategory.filter((x) => x.signed < 0).reduce((a, x) => a + x.signed, 0)
   const total = filtered.reduce((s, t) => s + t.amount, 0) * sign
   // which slice of time the charts and the table show, in words
   const scopeText = [
@@ -397,13 +414,22 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
           <div className="card">
             <h2 style={{ marginBottom: 2 }}>התפלגות לפי שורת תקציב</h2>
             <p className="muted" style={{ margin: '0 0 6px' }}>{scopeText} · לפי הסינון בטבלת התנועות</p>
+            {product !== 'credit_card' && (
+              <p style={{ margin: '0 0 6px', fontSize: 13 }}>
+                <span className="pos">הכנסות {signedILS(pieIncome)}</span> · <span className="neg">הוצאות {signedILS(pieExpense)}</span>
+                <span className="muted"> (גודל הפרוסה לפי הסכום, הסימן לפי הכיוון; ללא העברות פנימיות)</span>
+              </p>
+            )}
             <ResponsiveContainer width="100%" height={400}>
               <PieChart>
                 <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={55} outerRadius={115} paddingAngle={2}
                   label={PieLabel} labelLine>
                   {byCategory.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(v) => fmtILS(Number(v))} />
+                <Tooltip formatter={(v, _n, item) => {
+                  const p = (item as { payload?: { signed?: number; showSign?: boolean } }).payload
+                  return p?.showSign ? signedILS(p.signed ?? 0) : fmtILS(Number(v))
+                }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
