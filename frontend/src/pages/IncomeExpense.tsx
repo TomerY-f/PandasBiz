@@ -161,7 +161,7 @@ export default function IncomeExpense() {
           <table className="sheet">
             <thead>
               <tr>
-                {[{ key: 'name', label: 'פירוט' }, ...sheet.months.map((m) => ({ key: m, label: monthLabel(m) })), { key: 'avg', label: 'ממוצע' }].map((c) => (
+                {[{ key: 'name', label: 'פירוט' }, { key: 'avg', label: 'ממוצע' }, ...sheet.months.map((m) => ({ key: m, label: monthLabel(m) }))].map((c) => (
                   <th key={c.key} className="sortable"
                     onClick={() => setSort({ key: c.key, dir: sort?.key === c.key ? (sort.dir === 1 ? -1 : 1) : c.key === 'name' ? 1 : -1 })}>
                     {c.label}{sort?.key === c.key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
@@ -192,6 +192,7 @@ export default function IncomeExpense() {
                     {!isCollapsed && lines.map((l) => (
                       <tr key={l.name}>
                         <td>{l.name}</td>
+                        <td className="num avg">{n0(l.avg)}</td>
                         {sheet.months.map((m) => {
                           const isEditing = editing?.line === l.name && editing.month === m
                           return (
@@ -219,15 +220,14 @@ export default function IncomeExpense() {
                             </td>
                           )
                         })}
-                        <td className="num avg">{n0(l.avg)}</td>
                         <td className="num">{isExpense ? n0(l.need_4pct) : ''}</td>
                         <td className="num">{isExpense ? n0(l.need_3pct) : ''}</td>
                       </tr>
                     ))}
                     <tr className="total">
                       <td>סה"כ {g.label}</td>
-                      {sheet.months.map((m) => <td key={m} className="num">{n0(g.totals[m])}</td>)}
                       <td className="num avg">{n0(g.avg)}</td>
+                      {sheet.months.map((m) => <td key={m} className="num">{n0(g.totals[m])}</td>)}
                       <td className="num">{isExpense ? n0(g.need_4pct) : ''}</td>
                       <td className="num">{isExpense ? n0(g.need_3pct) : ''}</td>
                     </tr>
@@ -245,7 +245,7 @@ export default function IncomeExpense() {
               ] as const).map(([k, label]) => (
                 <tr key={k} className={k === 'balance' ? 'total' : ''}>
                   <td>{label}</td>
-                  {sheet.summary.map((s) => {
+                  {[...sheet.summary.filter((s) => s.month === 'avg'), ...sheet.summary.filter((s) => s.month !== 'avg')].map((s) => {
                     const v = s[k]
                     const text = k === 'savings_rate' ? (v == null ? '' : fmtPct(v as number)) : n0(v as number)
                     const cls = k === 'balance' && v ? ((v as number) >= 0 ? 'pos' : 'neg') : ''
