@@ -252,7 +252,7 @@ export default function ProductPage({ product, title, hint, children, upload = t
 
 // ---------- sections ----------
 
-const AVG_KEY = 'ממוצע שנתי'
+const AVG_KEY = 'ממוצע מתחילת השנה'
 
 // long sheet-line names (e.g. "אוכל בחוץ (כולל מסעדות...)") are cut at the bracket so labels fit the card
 const short = (n: string) => {
@@ -371,11 +371,15 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
       m.set(t.month_year, row)
     })
     const rows = Array.from(m.values()).sort((a, b) => String(a.month).localeCompare(String(b.month)))
-    // yearly average: mean monthly charge over the last 12 months with data, drawn across every bar
-    const totals = rows.map((r) => accounts.reduce((sum, a) => sum + ((r[a] as number) ?? 0), 0))
-    const last12 = totals.slice(-12)
-    const avg = last12.length ? Math.round(last12.reduce((x, y) => x + y, 0) / last12.length) : 0
-    return rows.map((r) => ({ ...r, [AVG_KEY]: avg }))
+    // year-to-date average: for each month, the mean monthly charge from January of that year up to it
+    let year = '', sum = 0, count = 0
+    return rows.map((r) => {
+      const y = String(r.month).slice(0, 4)
+      if (y !== year) { year = y; sum = 0; count = 0 }
+      sum += accounts.reduce((acc, a) => acc + ((r[a] as number) ?? 0), 0)
+      count += 1
+      return { ...r, [AVG_KEY]: Math.round(sum / count) }
+    })
   }, [txs, product, accounts])
 
   return (
@@ -406,7 +410,7 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
                 <Tooltip formatter={(v) => fmtILS(Number(v))} />
                 <Legend />
                 {accounts.map((a, i) => <Bar key={a} dataKey={a} stackId="c" fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                <Line type="linear" dataKey={AVG_KEY} stroke="#d63031" strokeWidth={2.5} strokeDasharray="6 4" dot={false} />
+                <Line type="monotone" dataKey={AVG_KEY} stroke="#d63031" strokeWidth={2.5} dot={{ r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
