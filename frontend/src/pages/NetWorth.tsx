@@ -157,7 +157,7 @@ export default function NetWorth() {
       {chart.length > 0 && (
         <div className="card">
           <h2>שווי נקי לאורך זמן</h2>
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer debounce={200} width="100%" height={280}>
             <AreaChart data={chart}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />

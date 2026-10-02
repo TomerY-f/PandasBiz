@@ -225,3 +225,34 @@ table.sheet tr.group td { background: #f1effd !important; }
 .pie-legend-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pie-legend-row .amt { font-weight: 600; font-variant-numeric: tabular-nums; }
 .pie-legend-row .pct { width: 34px; text-align: left; }
+
+/* ---------- phone layout ---------- */
+html, body { overflow-x: hidden; }
+.card { min-width: 0; }
+.recharts-responsive-container { min-width: 0; }
+@media (max-width: 760px) {
+  .layout { flex-direction: column; }
+  .sidebar {
+    width: auto; position: sticky; top: 0; z-index: 20;
+    flex-direction: row; flex-wrap: nowrap; overflow-x: auto; align-items: center;
+    padding: 8px 10px; gap: 6px; -webkit-overflow-scrolling: touch;
+  }
+  .sidebar .brand { padding: 4px 6px; font-size: 15px; white-space: nowrap; }
+  .sidebar .section { display: none; }
+  .sidebar a { white-space: nowrap; padding: 6px 10px; font-size: 13px; }
+  .member-select { border: none; padding: 0 4px; margin: 0; }
+  .member-select .label { display: none; }
+  .member-chips { flex-wrap: nowrap; }
+  .main { padding: 12px; width: 100%; }
+  h1 { font-size: 20px; }
+  .card { padding: 12px; overflow-x: auto; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stat .value { font-size: 18px; }
+  .row.spread { flex-wrap: wrap; }
+  .filters { gap: 8px; }
+  .filters input, .filters select { max-width: 100%; }
+  .dropzone { padding: 14px; }
+  .sheet-wrap.sticky { max-height: 70svh; }
+  .pie-legend { grid-template-columns: 1fr; }
+  table { font-size: 12.5px; }
+}

@@ -71,7 +71,7 @@ export default function Dashboard() {
         {months.length > 0 && (
           <div className="card">
             <h2>הכנסות מול הוצאות</h2>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer debounce={200} width="100%" height={280}>
               <BarChart data={months.map((s) => ({ month: monthLabel(s.month), הכנסות: s.income, צרכים: s.needs, רצונות: s.wants }))}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
@@ -88,7 +88,7 @@ export default function Dashboard() {
         {c.asset_map.length > 0 && (
           <div className="card">
             <h2>מפת הנכסים</h2>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer debounce={200} width="100%" height={280}>
               <PieChart>
                 <Pie data={c.asset_map} dataKey="value_ils" nameKey="label" innerRadius={60} outerRadius={100} paddingAngle={2}>
                   {c.asset_map.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -105,7 +105,7 @@ export default function Dashboard() {
         {nw.history.length > 1 && (
           <div className="card">
             <h2>שווי נקי לאורך זמן</h2>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer debounce={200} width="100%" height={260}>
               <AreaChart data={nw.history.map((h) => ({ month: monthLabel(h.month), 'כולל': h.net_worth_total, 'לפרישה': h.net_worth_retirement }))}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />

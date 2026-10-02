@@ -422,7 +422,7 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
                 <span className="muted"> (גודל הפרוסה לפי הסכום, הסימן לפי הכיוון; ללא העברות פנימיות)</span>
               </p>
             )}
-            <ResponsiveContainer width="100%" height={330}>
+            <ResponsiveContainer debounce={200} width="100%" height={330}>
               <PieChart>
                 <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={50} outerRadius={100} paddingAngle={2}
                   label={PieLabel}
@@ -458,7 +458,7 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
         {monthly.length > 0 && (
           <div className="card">
             <h2>חיובים לפי חודש וכרטיס</h2>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer debounce={200} width="100%" height={260}>
               <ComposedChart data={monthly}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
@@ -474,7 +474,7 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
         {balances.length > 1 && (
           <div className="card">
             <h2>יתרה בעו"ש</h2>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer debounce={200} width="100%" height={260}>
               <LineChart data={balances}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
@@ -606,7 +606,7 @@ function Holdings({ rows, usdIls, onRefresh, onChange }: { rows: HoldingRow[]; u
             <tr className="total"><td><b>סה"כ</b></td><td /><td /><td /><td><b>{fmtILS(total)}</b></td><td /><td /></tr>
           </tbody>
         </table>
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer debounce={200} width="100%" height={220}>
           <PieChart>
             <Pie data={pie} dataKey="value" nameKey="name" outerRadius={85}>
               {pie.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -854,7 +854,7 @@ function SnapshotChart({ data }: { data: ProductData }) {
   return (
     <div className="card">
       <h2>היסטוריית שווי</h2>
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer debounce={200} width="100%" height={240}>
         <LineChart data={rows}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" tick={{ fontSize: 10 }} />

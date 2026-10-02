@@ -125,7 +125,7 @@ export default function IncomeExpense() {
 
       <div className="card">
         <h2>הכנסות מול הוצאות</h2>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer debounce={200} width="100%" height={260}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" tick={{ fontSize: 11 }} />

@@ -164,7 +164,7 @@ export default function RealEstate() {
             {p.details && <Valuation d={p.details} purchase={p.purchase_price} current={p.current_value} />}
 
             {s && s.series.length > 0 ? (
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer debounce={200} width="100%" height={240}>
                 <BarChart data={s.series}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
@@ -234,7 +234,7 @@ function Valuation({ d, purchase, current }: { d: PropertyDetails; purchase: num
         <div className="grid grid-2" style={{ marginTop: 12 }}>
           <div>
             <h3>מחיר חציוני למ"ר ביהוד (דירות 3.5–4 חד׳)</h3>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer debounce={200} width="100%" height={200}>
               <BarChart data={d.market}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" tick={{ fontSize: 11 }} />
