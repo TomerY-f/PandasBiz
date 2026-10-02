@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
-import { Bar, BarChart, Cell, Line, LineChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
+import { Bar, Cell, ComposedChart, Line, LineChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 import { CHART_COLORS, apiGet, apiSend, fmtILS, fmtNum, memberQuery, withQuery } from '../api'
 import DropZone from '../components/DropZone'
 import { useMember } from '../components/MemberContext'
@@ -252,6 +252,24 @@ export default function ProductPage({ product, title, hint, children, upload = t
 
 // ---------- sections ----------
 
+const AVG_KEY = 'ממוצע שנתי'
+
+// long sheet-line names (e.g. "אוכל בחוץ (כולל מסעדות...)") are cut at the bracket so labels fit the card
+const short = (n: string) => {
+  const base = n.split(' (')[0]
+  return base.length > 20 ? `${base.slice(0, 19)}…` : base
+}
+
+// pie slice label: line name, amount and share, sized to stay readable
+function PieLabel(props: { x?: number; y?: number; textAnchor?: "inherit" | "middle" | "start" | "end"; name?: string; value?: number; percent?: number; fill?: string }) {
+  const { x = 0, y = 0, textAnchor = 'middle', name, value, percent, fill } = props
+  return (
+    <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={14} fontWeight={600} fill={fill}>
+      {`${short(name ?? '')}: ${fmtILS(Number(value))} (${Math.round((percent ?? 0) * 100)}%)`}
+    </text>
+  )
+}
+
 function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: string[]; product: string; onChange: () => void }) {
   // period: calendar month (1st–1st) or billing cycle (10th of the month – 9th of the next)
   const [periodType, setPeriodType] = useState<'month' | 'cycle'>(product === 'credit_card' ? 'cycle' : 'month')
@@ -352,8 +370,13 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
       row[t.account] = Math.round(((row[t.account] as number) ?? 0) - t.amount)
       m.set(t.month_year, row)
     })
-    return Array.from(m.values()).sort((a, b) => String(a.month).localeCompare(String(b.month)))
-  }, [txs, product])
+    const rows = Array.from(m.values()).sort((a, b) => String(a.month).localeCompare(String(b.month)))
+    // yearly average: mean monthly charge over the last 12 months with data, drawn across every bar
+    const totals = rows.map((r) => accounts.reduce((sum, a) => sum + ((r[a] as number) ?? 0), 0))
+    const last12 = totals.slice(-12)
+    const avg = last12.length ? Math.round(last12.reduce((x, y) => x + y, 0) / last12.length) : 0
+    return rows.map((r) => ({ ...r, [AVG_KEY]: avg }))
+  }, [txs, product, accounts])
 
   return (
     <>
@@ -361,11 +384,10 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
         {byCategory.length > 0 && (
           <div className="card">
             <h2>התפלגות לפי שורת תקציב</h2>
-            <ResponsiveContainer width="100%" height={340}>
+            <ResponsiveContainer width="100%" height={400}>
               <PieChart>
-                <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={45} outerRadius={95} paddingAngle={2}
-                  label={({ name, value, percent }) => `${name}: ${fmtILS(Number(value))} (${Math.round((percent ?? 0) * 100)}%)`}
-                  labelLine style={{ fontSize: 11 }}>
+                <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={55} outerRadius={115} paddingAngle={2}
+                  label={PieLabel} labelLine>
                   {byCategory.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmtILS(Number(v))} />
@@ -377,14 +399,15 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
           <div className="card">
             <h2>חיובים לפי חודש וכרטיס</h2>
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={monthly}>
+              <ComposedChart data={monthly}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} width={60} />
                 <Tooltip formatter={(v) => fmtILS(Number(v))} />
                 <Legend />
                 {accounts.map((a, i) => <Bar key={a} dataKey={a} stackId="c" fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-              </BarChart>
+                <Line type="linear" dataKey={AVG_KEY} stroke="#d63031" strokeWidth={2.5} strokeDasharray="6 4" dot={false} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         )}
