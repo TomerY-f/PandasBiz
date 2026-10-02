@@ -261,6 +261,8 @@ const short = (n: string) => {
 }
 
 // pie slice label: line name, amount and share, sized to stay readable
+const LABEL_MIN = 0.06  // slices smaller than this get no label on the chart (they'd overlap); the legend lists every slice
+
 const signedILS = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtILS(Math.abs(v))}`
 
 function PieLabel(props: {
@@ -268,7 +270,7 @@ function PieLabel(props: {
   fill?: string; payload?: { signed?: number; showSign?: boolean }
 }) {
   const { x = 0, y = 0, textAnchor = 'middle', name, value, percent, fill, payload } = props
-  if ((percent ?? 0) < 0.03) return null  // tiny slices: the label would overlap its neighbours; hover shows it
+  if ((percent ?? 0) < LABEL_MIN) return null  // small slices are listed in the legend under the chart instead
   // on bank pages, money in is "+" in green and money out is "−" in red, like the table below
   const signed = payload?.showSign ? payload.signed ?? 0 : null
   const amount = signed == null ? fmtILS(Number(value)) : signedILS(signed)
@@ -420,10 +422,14 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
                 <span className="muted"> (גודל הפרוסה לפי הסכום, הסימן לפי הכיוון; ללא העברות פנימיות)</span>
               </p>
             )}
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={330}>
               <PieChart>
-                <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={55} outerRadius={115} paddingAngle={2}
-                  label={PieLabel} labelLine>
+                <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={50} outerRadius={100} paddingAngle={2}
+                  label={PieLabel}
+                  labelLine={(props: { percent?: number; points?: { x: number; y: number }[]; stroke?: string }) =>
+                    (props.percent ?? 0) < LABEL_MIN || !props.points ? <g /> : (
+                      <polyline points={props.points.map((pt) => `${pt.x},${pt.y}`).join(' ')} stroke={props.stroke} fill="none" />
+                    )}>
                   {byCategory.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>
                 <Tooltip formatter={(v, _n, item) => {
@@ -432,6 +438,21 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
                 }} />
               </PieChart>
             </ResponsiveContainer>
+            <div className="pie-legend">
+              {byCategory.map((c, i) => {
+                const totalAbs = byCategory.reduce((a, x) => a + x.value, 0) || 1
+                return (
+                  <div key={c.name} className="pie-legend-row">
+                    <span className="swatch" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                    <span className="name">{c.name}</span>
+                    <span className={`amt ${c.showSign ? (c.signed >= 0 ? 'pos' : 'neg') : ''}`}>
+                      {c.showSign ? signedILS(c.signed) : fmtILS(c.value)}
+                    </span>
+                    <span className="pct muted">{Math.round((c.value / totalAbs) * 100)}%</span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
         {monthly.length > 0 && (
