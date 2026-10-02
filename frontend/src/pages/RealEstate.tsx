@@ -21,6 +21,7 @@ export default function RealEstate() {
   const [stats, setStats] = useState<Record<number, PropertyStats>>({})
   const [form, setForm] = useState(emptyForm)
   const [showForm, setShowForm] = useState(false)
+  const [savedMsg, setSavedMsg] = useState('')
   const [valueForm, setValueForm] = useState({ propertyId: 0, date: new Date().toISOString().slice(0, 10), value: '' })
 
   const reload = useCallback(() => {
@@ -63,7 +64,9 @@ export default function RealEstate() {
       note: 'שערוך ידני',
     })
     setValueForm({ ...valueForm, propertyId: 0, value: '' })
+    setSavedMsg(`השווי של ${prop.name} עודכן ל-${fmtILS(+valueForm.value)}`)
     reload()
+    window.dispatchEvent(new Event('pandasbiz:refresh'))
   }
 
   return (
@@ -114,18 +117,23 @@ export default function RealEstate() {
           <div className="card" key={p.id}>
             <div className="row spread">
               <h2>🏠 {p.name} {p.address && <span className="muted">— {p.address}</span>}</h2>
-              <button className="ghost small" onClick={() => setValueForm({ ...valueForm, propertyId: p.id })}>
+              <button className="small" onClick={() => { setSavedMsg(''); setValueForm({ ...valueForm, propertyId: p.id, value: String(p.current_value ?? '') }) }}>
                 עדכן שווי
               </button>
             </div>
 
+            {savedMsg && <div className="alert warn" onClick={() => setSavedMsg('')}>✓ {savedMsg}</div>}
+
             {valueForm.propertyId === p.id && (
-              <div className="row" style={{ marginBottom: 12 }}>
-                <input type="date" value={valueForm.date}
-                  onChange={(e) => setValueForm({ ...valueForm, date: e.target.value })} />
-                <input type="number" placeholder="שווי משוערך ₪" value={valueForm.value}
-                  onChange={(e) => setValueForm({ ...valueForm, value: e.target.value })} style={{ width: 160 }} />
+              <div className="value-form">
+                <b>עדכון שווי הנכס</b>
+                <label>נכון לתאריך<input type="date" value={valueForm.date}
+                  onChange={(e) => setValueForm({ ...valueForm, date: e.target.value })} /></label>
+                <label>שווי חדש ₪<input type="number" autoFocus value={valueForm.value}
+                  onChange={(e) => setValueForm({ ...valueForm, value: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && saveValue()} style={{ width: 160 }} /></label>
                 <button onClick={saveValue}>שמור</button>
+                <button className="ghost" onClick={() => setValueForm({ ...valueForm, propertyId: 0 })}>ביטול</button>
               </div>
             )}
 
@@ -153,7 +161,7 @@ export default function RealEstate() {
               </div>
             </div>
 
-            {p.details && <Valuation d={p.details} purchase={p.purchase_price} />}
+            {p.details && <Valuation d={p.details} purchase={p.purchase_price} current={p.current_value} />}
 
             {s && s.series.length > 0 ? (
               <ResponsiveContainer width="100%" height={240}>
@@ -179,7 +187,7 @@ export default function RealEstate() {
   )
 }
 
-function Valuation({ d, purchase }: { d: PropertyDetails; purchase: number | null }) {
+function Valuation({ d, purchase, current }: { d: PropertyDetails; purchase: number | null; current: number | null }) {
   const e = d.estimate
   return (
     <div className="valuation">
@@ -208,10 +216,16 @@ function Valuation({ d, purchase }: { d: PropertyDetails; purchase: number | nul
         )}
         {e && (
           <div className="estimate">
-            <h3>הערכת שווי נוכחית</h3>
-            <div className="big">{fmtILS(e.value)}</div>
-            <div className="muted">טווח {fmtILS(e.low)} – {fmtILS(e.high)} · נכון ל-{e.date}</div>
-            {purchase != null && <div className={e.value >= purchase ? 'pos' : 'neg'}>{fmtILS(e.value - purchase)} ({fmtNum(((e.value - purchase) / purchase) * 100, 1)}%) מאז הרכישה</div>}
+            <h3>השווי בשימוש (שווי נקי ודשבורד)</h3>
+            <div className="big">{fmtILS(current ?? e.value)}</div>
+            {purchase != null && current != null && (
+              <div className={current >= purchase ? 'pos' : 'neg'}>
+                {fmtILS(current - purchase)} ({fmtNum(((current - purchase) / purchase) * 100, 1)}%) מאז הרכישה
+              </div>
+            )}
+            <p style={{ marginBottom: 4 }}>
+              הערכת שוק לפי עסקאות: <b>{fmtILS(e.value)}</b> <span className="muted">(טווח {fmtILS(e.low)} – {fmtILS(e.high)}, {e.date})</span>
+            </p>
             <p className="muted">{e.method}</p>
           </div>
         )}

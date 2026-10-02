@@ -111,6 +111,20 @@ export default function NetWorth() {
           <div className="sub">{fmtILS(Math.max(0, data.withdraw_3pct_monthly))} בשיעור 3%</div></div>
       </div>
 
+      <div className="card explain">
+        <h2>איך מחושב "שווי נקי לפרישה מוקדמת"?</h2>
+        <p>
+          זה הכסף שיכול לממן אתכם לפני גיל 60: <b>נכסים מניבים ונזילים</b> פחות <b>כל ההתחייבויות</b>.
+          {' '}{fmtILS(c.liquid)} − {fmtILS(Math.abs(c.liabilities))} = <b>{fmtILS(c.net_worth_retirement)}</b>.
+        </p>
+        <p className="muted">
+          נכסים נזילים: מזומן ועו"ש, מט"ח, פקדונות וקרנות כספיות, אג"ח ומניות, קרן השתלמות, קופת גמל להשקעה ונדל"ן להשקעה.
+          לא נכללים: דירת המגורים, הרכב, קרנות פנסיה וקופות גמל לתגמולים (נעולות עד הפרישה) וערך פדיון ביטוח.
+          התחייבויות: משכנתא, הלוואות וחיובי אשראי שטרם ירדו. כך זה מחושב גם בגיליון של הסולידית
+          ("שווי נקי לפרישה מוקדמת" = סה"כ נכסים לפרישה מוקדמת + סה"כ התחייבויות).
+        </p>
+      </div>
+
       <div className="card row">
         <span>כמה כסף אתם <b>באמת</b> צריכים כדי לחיות בחודש?</span>
         <input type="number" value={need} placeholder={data.monthly_need ? String(Math.round(data.monthly_need)) : ''}

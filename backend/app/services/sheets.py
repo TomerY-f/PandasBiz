@@ -66,6 +66,8 @@ def income_expense_sheet(db: Session, end: str | None = None, member: str | None
     manual = manual_totals(db, months, member)
     active = sorted({m for (_, m) in tx} | {m for (_, m) in manual})
     n_active = max(len(active), 1)
+    if active:
+        months = [m for m in months if m >= active[0]]  # no empty columns before the first month with data
 
     lines = list(db.scalars(select(BudgetLine).order_by(BudgetLine.sort, BudgetLine.id)))
     known = {line.name for line in lines}

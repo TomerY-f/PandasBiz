@@ -214,3 +214,7 @@ table.sheet tr.group td { background: #f1effd !important; }
 .valuation h3 { font-size: 14px; margin: 0 0 8px; color: var(--muted); }
 .valuation .estimate { background: var(--accent-soft); border-radius: 12px; padding: 14px; }
 .valuation .estimate .big { font-size: 28px; font-weight: 800; color: var(--accent); }
+
+.value-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; background: var(--accent-soft); border: 1px solid #c9c3f7; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.value-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.explain p { margin: 6px 0; line-height: 1.6; max-width: 900px; }

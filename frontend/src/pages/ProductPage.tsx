@@ -132,6 +132,10 @@ export default function ProductPage({ product, title, hint, children, upload = t
 
   useEffect(load, [load])
   useEffect(() => {
+    window.addEventListener('pandasbiz:refresh', load)
+    return () => window.removeEventListener('pandasbiz:refresh', load)
+  }, [load])
+  useEffect(() => {
     apiGet<{ lines: { name: string }[] }>('/lines').then((r) => setLines(r.lines.map((l) => l.name)))
   }, [])
 
@@ -164,7 +168,9 @@ export default function ProductPage({ product, title, hint, children, upload = t
         {data && data.accounts.length > 0 && (
           <div className="card stat" style={{ margin: 0, padding: '10px 16px' }}>
             <div className="label">סה"כ</div>
-            <div className={`value ${data.total_ils < 0 ? 'neg' : ''}`} style={{ fontSize: 20 }}>{fmtILS(data.total_ils)}</div>
+            <div className={`value ${data.total_ils < 0 && product !== 'credit_card' ? 'neg' : ''}`} style={{ fontSize: 20 }}>
+              {fmtILS(product === 'credit_card' ? -data.total_ils || 0 : data.total_ils)}
+            </div>
           </div>
         )}
       </div>
@@ -204,7 +210,7 @@ export default function ProductPage({ product, title, hint, children, upload = t
                     const last = data.snapshots.filter((x) => x.account_id === a.id).slice(-1)[0]
                     return <td>{last ? `${fmtILS(-last.value)} · ${last.date}` : '—'}</td>
                   })()}
-                  <td className={a.value_ils < 0 ? 'neg' : ''}>{fmtILS(a.value_ils)}</td>
+                  <td className={a.value_ils < 0 && product !== 'credit_card' ? 'neg' : ''}>{fmtILS(product === 'credit_card' ? -a.value_ils || 0 : a.value_ils)}</td>
                 </tr>
               ))}
             </tbody>
@@ -256,6 +262,17 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
   )
   const accounts = useMemo(() => Array.from(new Set(txs.map((t) => t.account))), [txs])
   const [month, setMonth] = useState('')
+  // credit cards open on the latest billing cycle only (the full history is heavy to render)
+  const [periodInit, setPeriodInit] = useState(false)
+  useEffect(() => {
+    if (!periodInit && product === 'credit_card' && months.length) {
+      setMonth(months[0])
+      setPeriodInit(true)
+    }
+  }, [months, periodInit, product])
+  // charges are shown as positive amounts and refunds as negative on card pages
+  const sign = product === 'credit_card' ? -1 : 1
+  const [saved, setSaved] = useState<number | null>(null)
   const [account, setAccount] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -305,13 +322,22 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
     return Array.from(m.entries())
       .map(([name, value]) => ({ name, value: Math.round(Math.abs(value)) }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 12)
+      .reduce<{ name: string; value: number }[]>((acc, item, i) => {
+        if (i < 8) acc.push(item)
+        else if (acc.length === 8) acc.push({ name: 'אחר', value: item.value })
+        else acc[8].value += item.value
+        return acc
+      }, [])
   }, [filtered, product])
-  const total = filtered.reduce((s, t) => s + t.amount, 0)
+  const total = filtered.reduce((s, t) => s + t.amount, 0) * sign
 
   const setCat = async (t: Tx, value: string) => {
+    t.category = value === '__auto' ? t.category : value  // show the choice at once; the reload confirms it
+    t.category_locked = value !== '__auto'
+    setSaved(t.id)
     await apiSend('PATCH', `/transactions/${t.id}`, value === '__auto' ? { category: '', unlock: true } : { category: value })
     onChange()
+    setTimeout(() => setSaved((cur) => (cur === t.id ? null : cur)), 2500)
   }
 
   const balances = product === 'bank_current'
@@ -335,9 +361,11 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
         {byCategory.length > 0 && (
           <div className="card">
             <h2>התפלגות לפי שורת תקציב</h2>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={340}>
               <PieChart>
-                <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={50} outerRadius={95} paddingAngle={2}>
+                <Pie data={byCategory} dataKey="value" nameKey="name" innerRadius={45} outerRadius={95} paddingAngle={2}
+                  label={({ name, value, percent }) => `${name}: ${fmtILS(Number(value))} (${Math.round((percent ?? 0) * 100)}%)`}
+                  labelLine style={{ fontSize: 11 }}>
                   {byCategory.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmtILS(Number(v))} />
@@ -378,7 +406,7 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
       <div className="card">
         <div className="row spread">
           <h2>תנועות ({filtered.length})</h2>
-          <span className="muted">סה"כ: <b className={total < 0 ? 'neg' : 'pos'}>{fmtILS(total)}</b></span>
+          <span className="muted">{product === 'credit_card' ? 'סה"כ חיובים' : 'סה"כ'}: <b className={product === 'credit_card' ? '' : total < 0 ? 'neg' : 'pos'}>{fmtILS(total)}</b></span>
         </div>
         <div className="filters">
           <label>חיפוש<input placeholder="תיאור" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 140 }} /></label>
@@ -432,14 +460,15 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
                   <td>{t.description}</td>
                   {accounts.length > 1 && <td className="muted">{t.account}</td>}
                   <td className="muted">{t.sector}</td>
-                  <td className={t.amount < 0 ? 'neg' : 'pos'}>{fmtNum(t.amount)}</td>
+                  <td className={product === 'credit_card' ? (t.amount > 0 ? 'pos' : '') : t.amount < 0 ? 'neg' : 'pos'}>{fmtNum(t.amount * sign)}</td>
                   <td>
                     <select value={t.category} onChange={(e) => setCat(t, e.target.value)} title={t.category_locked ? 'סווג ידנית' : 'סווג אוטומטית'}>
                       {!lines.includes(t.category) && <option value={t.category}>{t.category}</option>}
                       {lines.map((l) => <option key={l} value={l}>{l}</option>)}
                       {t.category_locked && <option value="__auto">↺ חזרה לסיווג אוטומטי</option>}
                     </select>
-                    {t.category_locked && <span className="badge" style={{ marginRight: 4 }}>ידני</span>}
+                    {saved === t.id ? <span className="badge green" style={{ marginRight: 4 }}>נשמר ✓</span>
+                      : t.category_locked && <span className="badge" style={{ marginRight: 4 }}>ידני</span>}
                   </td>
                   {product === 'bank_current' && <td className="muted">{t.balance == null ? '' : fmtNum(t.balance)}</td>}
                 </tr>
@@ -735,7 +764,7 @@ function SnapshotChart({ data }: { data: ProductData }) {
   const names = new Map(data.accounts.map((a) => [a.id, a.name]))
   data.snapshots.forEach((s) => {
     const row = byDate.get(s.date) ?? { date: s.date }
-    row[names.get(s.account_id) ?? String(s.account_id)] = s.value
+    row[names.get(s.account_id) ?? String(s.account_id)] = data.product === 'credit_card' ? -s.value : s.value
     byDate.set(s.date, row)
   })
   const rows = Array.from(byDate.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)))
