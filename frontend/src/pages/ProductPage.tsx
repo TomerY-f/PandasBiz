@@ -292,10 +292,10 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
   )
   const accounts = useMemo(() => Array.from(new Set(txs.map((t) => t.account))), [txs])
   const [month, setMonth] = useState('')
-  // credit cards open on the latest billing cycle only (the full history is heavy to render)
+  // open on the latest period only: billing cycle for cards, calendar month for the bank (the full history is heavy)
   const [periodInit, setPeriodInit] = useState(false)
   useEffect(() => {
-    if (!periodInit && product === 'credit_card' && months.length) {
+    if (!periodInit && months.length) {
       setMonth(months[0])
       setPeriodInit(true)
     }
