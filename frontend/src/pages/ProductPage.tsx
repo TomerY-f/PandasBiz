@@ -346,7 +346,6 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
   const byCategory = useMemo(() => {
     const m = new Map<string, number>()
     filtered.forEach((t) => {
-      if (t.category === 'העברה פנימית') return
       m.set(t.category, (m.get(t.category) ?? 0) + (product === 'credit_card' ? -t.amount : t.amount))
     })
     // slice size is the absolute amount; `signed` keeps the direction (+ income / − expense) for labels
@@ -419,7 +418,7 @@ function Transactions({ txs, lines, product, onChange }: { txs: Tx[]; lines: str
             {product !== 'credit_card' && (
               <p style={{ margin: '0 0 6px', fontSize: 13 }}>
                 <span className="pos">הכנסות {signedILS(pieIncome)}</span> · <span className="neg">הוצאות {signedILS(pieExpense)}</span>
-                <span className="muted"> (גודל הפרוסה לפי הסכום, הסימן לפי הכיוון; ללא העברות פנימיות)</span>
+                <span className="muted"> (גודל הפרוסה לפי הסכום, הסימן לפי הכיוון)</span>
               </p>
             )}
             <ResponsiveContainer debounce={200} width="100%" height={330}>

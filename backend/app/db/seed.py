@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 
 from .models import INTERNAL_TRANSFER, UNCATEGORIZED, BudgetLine, CategoryRule, SectorMap
 
+# Bank-side lines that are shown on the bank page but not counted in the income & expenses sheet:
+# securities buys/sells move money between own assets, and card payoffs are already counted per card transaction.
+SECURITIES_LINE = "ניירות ערך"
+CARD_PAYOFF_LINE = "אשראי"
+
 # (group, name, personal-inflation group) — order as in "מעקב הכנסות והוצאות"
 BUDGET_LINES = [
     ("income", "שכר עבודה #1 - נטו", ""),
@@ -85,6 +90,8 @@ BUDGET_LINES = [
     ("saving_net", "הפקדות לאפיק חיסכון אחר", ""),
     ("uncategorized", UNCATEGORIZED, "שונות"),
     ("excluded", INTERNAL_TRANSFER, ""),
+    ("excluded", SECURITIES_LINE, ""),
+    ("excluded", CARD_PAYOFF_LINE, ""),
 ]
 
 # Personal-inflation groups (the "מחשבון אינפלציה אישית" sheet)
@@ -124,16 +131,17 @@ SECTOR_MAP = {
 # (pattern, line, direction, priority) — generic Israeli merchants / bank wording
 RULES = [
     # credit-card payoffs and moves between own accounts (counted elsewhere)
-    ("ישראכרט", INTERNAL_TRANSFER, "out", 50),
-    ("דיינרס", INTERNAL_TRANSFER, "out", 50),
-    ("הרשאה כאל", INTERNAL_TRANSFER, "out", 50),
-    ("כ.א.ל", INTERNAL_TRANSFER, "out", 50),
-    ("מקס איט", INTERNAL_TRANSFER, "out", 50),
-    ("לאומי קארד", INTERNAL_TRANSFER, "out", 50),
-    ("אמריקן אקספרס", INTERNAL_TRANSFER, "out", 50),
-    ("כרטיסי אשראי", INTERNAL_TRANSFER, "out", 40),
-    ("נע-קניה", INTERNAL_TRANSFER, "", 50),
-    ("נע-מכירה", INTERNAL_TRANSFER, "", 50),
+    ("ישראכרט", CARD_PAYOFF_LINE, "out", 50),
+    ("ישראכארט", CARD_PAYOFF_LINE, "out", 50),
+    ("דיינרס", CARD_PAYOFF_LINE, "out", 50),
+    ("הרשאה כאל", CARD_PAYOFF_LINE, "out", 50),
+    ("כ.א.ל", CARD_PAYOFF_LINE, "out", 50),
+    ("מקס איט", CARD_PAYOFF_LINE, "out", 50),
+    ("לאומי קארד", CARD_PAYOFF_LINE, "out", 50),
+    ("אמריקן אקספרס", CARD_PAYOFF_LINE, "out", 50),
+    ("כרטיסי אשראי", CARD_PAYOFF_LINE, "out", 40),
+    ("נע-קניה", SECURITIES_LINE, "", 50),
+    ("נע-מכירה", SECURITIES_LINE, "", 50),
     ("רכישת מטח", INTERNAL_TRANSFER, "", 50),
     ("הע.מטח", INTERNAL_TRANSFER, "", 50),
     ("פיקדון", INTERNAL_TRANSFER, "", 30),
@@ -210,4 +218,19 @@ def seed(db: Session) -> None:
     if db.scalar(select(CategoryRule).limit(1)) is None:
         for pattern, line, direction, priority in RULES:
             db.add(CategoryRule(pattern=pattern, category=line, direction=direction, priority=priority))
+    else:
+        upgrade_rules(db)
     db.commit()
+
+
+def upgrade_rules(db: Session) -> None:
+    """Brings an existing DB up to the current seed rules: moves default internal-transfer rules for card
+    payoffs and securities to their own lines, and adds missing seed patterns. User-edited rules are kept."""
+    existing = {(r.pattern, r.direction): r for r in db.scalars(select(CategoryRule))}
+    for pattern, line, direction, priority in RULES:
+        rule = existing.get((pattern, direction))
+        if rule is None:
+            if line in (SECURITIES_LINE, CARD_PAYOFF_LINE):
+                db.add(CategoryRule(pattern=pattern, category=line, direction=direction, priority=priority))
+        elif rule.category == INTERNAL_TRANSFER and line in (SECURITIES_LINE, CARD_PAYOFF_LINE):
+            rule.category = line
