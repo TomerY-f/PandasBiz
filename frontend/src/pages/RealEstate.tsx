@@ -233,7 +233,7 @@ function Valuation({ d, purchase, current }: { d: PropertyDetails; purchase: num
       {d.market && d.market.length > 0 && (
         <div className="grid grid-2" style={{ marginTop: 12 }}>
           <div>
-            <h3>מחיר חציוני למ"ר ביהוד (דירות 3.5–4 חד׳)</h3>
+            <h3>מחיר חציוני למ"ר באזור (דירות דומות)</h3>
             <ResponsiveContainer debounce={200} width="100%" height={200}>
               <BarChart data={d.market}>
                 <CartesianGrid strokeDasharray="3 3" />
