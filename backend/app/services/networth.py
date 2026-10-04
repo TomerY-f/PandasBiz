@@ -6,7 +6,8 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..db.models import NW_BUCKETS, PRODUCTS, Account, AssetSnapshot, Holding
+from ..db.models import INTERNAL_TRANSFER, NW_BUCKETS, PRODUCTS, Account, AssetSnapshot, Holding, Transaction
+from ..db.seed import SECURITIES_LINE
 from .market import get_usd_ils
 
 TYPE_LABELS = {
@@ -60,6 +61,15 @@ def card_value_at(snaps: list[AssetSnapshot], at: date) -> float:
     return min(upcoming, key=lambda s: s.date).value if upcoming else 0.0
 
 
+def bank_flows(db: Session) -> dict[str, list[Transaction]]:
+    """Bank transactions that move money into an asset account, per product (negative amount = money in)."""
+    txs = list(db.scalars(select(Transaction).where(Transaction.source == "bank")))
+    return {
+        "bank_securities": [t for t in txs if t.category == SECURITIES_LINE],
+        "fx": [t for t in txs if t.category == INTERNAL_TRANSFER and "מטח" in (t.description or "")],
+    }
+
+
 def account_values(db: Session, accounts: list[Account], at: date | None = None) -> list[dict]:
     """Per-account value split by bucket. `at` = None means now (live holdings valuation)."""
     usd_ils = get_usd_ils(db)
@@ -69,6 +79,8 @@ def account_values(db: Session, accounts: list[Account], at: date | None = None)
     ids = [a.id for a in accounts]
     for s in db.scalars(select(AssetSnapshot).where(AssetSnapshot.account_id.in_(ids)).order_by(AssetSnapshot.date)):
         snaps_by_account[s.account_id].append(s)
+
+    flows = bank_flows(db) if at is not None else {}
 
     rows = []
     for a in accounts:
@@ -84,10 +96,15 @@ def account_values(db: Session, accounts: list[Account], at: date | None = None)
                 parts[h.asset_class or account_bucket(a, v)] += v
         else:
             past = [s for s in snaps if s.date <= at_date]
-            if not past and at is not None and snaps:
-                past = snaps[:1]  # history before the first known value: carry the earliest value back
             if past:
                 v = snapshot_value(past[-1], a, usd_ils)
+                parts[account_bucket(a, v)] += v
+            elif at is not None and snaps:
+                # before the first known value: start from it and undo the money that moved in since then
+                # (securities bought / FX purchased from the bank account), otherwise carry it back as is
+                v = snapshot_value(snaps[0], a, usd_ils)
+                moved_in = sum(-t.amount for t in flows.get(a.product, []) if at_date < t.date <= snaps[0].date)
+                v = max(v - moved_in, 0.0) if a.product in flows else v
                 parts[account_bucket(a, v)] += v
         total = sum(parts.values())
         if not parts:
