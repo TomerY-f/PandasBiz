@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { apiGet, apiSend, fmtILS, fmtNum, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
+import { type AssetReturn, RETURN_MARK, apiGet, apiSend, fmtReturn, fmtILS, fmtNum, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
 import { useMember } from '../components/MemberContext'
 import NetWorthChart from '../components/NetWorthChart'
 
@@ -15,7 +15,7 @@ interface Totals {
 interface HistoryRow extends Totals { month: string; change: number | null; change_pct: number | null }
 interface BreakdownRow { account_id: number; name: string; product_label: string; owner_id: number | null; value_ils: number; parts: Record<string, number> }
 interface NetWorthData {
-  current: Totals & { breakdown: BreakdownRow[]; usd_ils: number }
+  current: Totals & { breakdown: BreakdownRow[]; usd_ils: number; bucket_returns: Record<string, AssetReturn>; return_kinds: Record<string, string> }
   history: HistoryRow[]
   monthly_need: number | null
   years_of_living: number | null
@@ -139,20 +139,32 @@ export default function NetWorth() {
             <div className="card" key={g.key}>
               <h2>{GROUP_LABELS[g.key]}</h2>
               <table>
+                {g.key !== 'liability' && <thead><tr><th /><th>שווי</th><th>תשואה מתחילת השנה</th></tr></thead>}
                 <tbody>
-                  {g.buckets.map((b) => (
-                    <tr key={b.key}>
-                      <td>{b.label}</td>
-                      <td className={(c.buckets[b.key] ?? 0) < 0 ? 'neg' : ''}>{c.buckets[b.key] ? fmtILS(c.buckets[b.key]) : <span className="muted">—</span>}</td>
-                    </tr>
-                  ))}
-                  <tr className="total"><td><b>סה"כ</b></td><td><b>{fmtILS(total)}</b></td></tr>
+                  {g.buckets.map((b) => {
+                    const r = c.bucket_returns?.[b.key]
+                    return (
+                      <tr key={b.key}>
+                        <td>{b.label}</td>
+                        <td className={(c.buckets[b.key] ?? 0) < 0 ? 'neg' : ''}>{c.buckets[b.key] ? fmtILS(c.buckets[b.key]) : <span className="muted">—</span>}</td>
+                        {g.key !== 'liability' && (
+                          <td className={r ? (r.pct >= 0 ? 'pos' : 'neg') : 'muted'} title={r ? c.return_kinds[r.kind] : ''}>{r ? fmtReturn(r) : ''}</td>
+                        )}
+                      </tr>
+                    )
+                  })}
+                  <tr className="total"><td><b>סה"כ</b></td><td><b>{fmtILS(total)}</b></td>{g.key !== 'liability' && <td />}</tr>
                 </tbody>
               </table>
             </div>
           )
         })}
       </div>
+      <p className="muted" style={{ marginTop: -8 }}>
+        תשואה מתחילת השנה: לפנסיה, השתלמות וגמל לפי דוח המסלקה (דיווח משרד האוצר, משוקלל לפי הצבירה);
+        {' '}{RETURN_MARK.since_purchase} מניות, אג"ח וקרנות כספיות: תשואה מאז הקנייה, כי בקבצים אין נתון מתחילת השנה;
+        {' '}{RETURN_MARK.value_change} נדל"ן: שינוי בשווי לפי עדכוני השווי שלכם.
+      </p>
 
       {chart.length > 0 && (
         <div className="card">

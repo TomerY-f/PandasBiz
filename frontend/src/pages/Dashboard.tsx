@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { CHART_COLORS, apiGet, fmtILS, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
+import { type AssetReturn, CHART_COLORS, apiGet, fmtReturn, fmtILS, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
 import { useMember } from '../components/MemberContext'
 import NetWorthChart, { type NetWorthPoint } from '../components/NetWorthChart'
 
@@ -15,7 +15,7 @@ interface NW {
     illiquid: number
     liabilities: number
     asset_map: { type: string; label: string; value_ils: number }[]
-    by_product: { label: string; value_ils: number }[]
+    by_product: { label: string; value_ils: number; return?: AssetReturn | null }[]
   }
   history: NetWorthPoint[]
   years_of_living: number | null
@@ -113,12 +113,18 @@ export default function Dashboard() {
           <div className="card">
             <h2>לפי מוצר</h2>
             <table>
+              <thead><tr><th>מוצר</th><th>שווי</th><th>תשואה מתחילת השנה</th></tr></thead>
               <tbody>
                 {c.by_product.map((p) => (
-                  <tr key={p.label}><td>{p.label}</td><td className={p.value_ils < 0 ? 'neg' : ''}>{fmtILS(p.value_ils)}</td></tr>
+                  <tr key={p.label}>
+                    <td>{p.label}</td>
+                    <td className={p.value_ils < 0 ? 'neg' : ''}>{fmtILS(p.value_ils)}</td>
+                    <td className={p.return ? (p.return.pct >= 0 ? 'pos' : 'neg') : 'muted'}>{fmtReturn(p.return)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
+            <p className="muted">פנסיה והשתלמות: מתחילת השנה לפי דוח המסלקה · * מאז הקנייה · † שינוי בשווי הנכס מתחילת השנה</p>
           </div>
         )}
       </div>

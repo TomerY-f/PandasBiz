@@ -144,9 +144,79 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
+RETURN_KINDS = {
+    "ytd": "תשואה מתחילת השנה (דיווח משרד האוצר)",
+    "since_purchase": "תשואה מאז הקנייה (אין בקובץ נתון מתחילת השנה)",
+    "value_change": "שינוי בשווי מתחילת השנה (לפי עדכוני השווי)",
+}
+
+
+def _weighted(acc: dict, key: str, pct: float, weight: float, kind: str) -> None:
+    cur = acc.setdefault(key, {"sum": 0.0, "w": 0.0, "kinds": set()})
+    cur["sum"] += pct * weight
+    cur["w"] += weight
+    cur["kinds"].add(kind)
+
+
+def _finish(acc: dict) -> dict:
+    out = {}
+    for k, v in acc.items():
+        if v["w"] > 0:
+            kinds = v["kinds"]
+            kind = "ytd" if kinds == {"ytd"} else "value_change" if kinds == {"value_change"} else "since_purchase"
+            out[k] = {"pct": round(v["sum"] / v["w"], 2), "kind": kind}
+    return out
+
+
+def asset_returns(db: Session, rows: list[dict]) -> tuple[dict, dict]:
+    """Return per net-worth bucket and per product label, weighted by value:
+    pension products use the report's year-to-date track returns, holdings their gain since purchase,
+    real estate its value change since the end of last year."""
+    from ..db.models import PensionProduct  # local import: avoid widening the module's import list
+    import json
+
+    usd_ils = get_usd_ils(db)
+    by_bucket: dict = {}
+    by_product: dict = {}
+    year_start = date(date.today().year - 1, 12, 31)
+    for r in rows:
+        a = db.get(Account, r["account_id"])
+        label = r["product_label"] or r["type_label"]
+        if a.product == "pension":
+            p = db.scalar(select(PensionProduct).where(PensionProduct.account_id == a.id))
+            tracks = json.loads(p.yields)["tracks"] if p and p.yields else []
+            w = sum(t["balance"] for t in tracks if t.get("ytd") is not None)
+            if w:
+                ytd = sum(t["ytd"] * t["balance"] for t in tracks if t.get("ytd") is not None) / w
+                for bucket, value in r["parts"].items():
+                    _weighted(by_bucket, bucket, ytd, value, "ytd")
+                _weighted(by_product, label, ytd, r["value_ils"], "ytd")
+        elif a.holdings:
+            for h in a.holdings:
+                if not h.cost_basis or h.last_price is None or h.asset_class == "cash":
+                    continue
+                native = h.quantity * h.last_price
+                pct = (native / h.cost_basis - 1) * 100
+                value = holding_value_ils(h, usd_ils)
+                _weighted(by_bucket, h.asset_class or account_bucket(a, value), pct, value, "since_purchase")
+                _weighted(by_product, label, pct, value, "since_purchase")
+        elif a.product == "real_estate":
+            snaps = list(db.scalars(select(AssetSnapshot).where(AssetSnapshot.account_id == a.id).order_by(AssetSnapshot.date)))
+            if len(snaps) >= 1:
+                before = [x for x in snaps if x.date <= year_start] or snaps[:1]
+                start, now = before[-1].value, snaps[-1].value
+                if start and snaps[-1].date > year_start:
+                    pct = (now / start - 1) * 100
+                    for bucket, value in r["parts"].items():
+                        _weighted(by_bucket, bucket, pct, value, "value_change")
+                    _weighted(by_product, label, pct, r["value_ils"], "value_change")
+    return _finish(by_bucket), _finish(by_product)
+
+
 def compute_net_worth(db: Session, member: str | None = None) -> dict:
     rows = account_values(db, member_accounts(db, member))
     s = summarize(rows)
+    bucket_ret, product_ret = asset_returns(db, rows)
     by_product: dict[str, float] = defaultdict(float)
     for r in rows:
         by_product[r["product_label"] or r["type_label"]] += r["value_ils"]
@@ -161,7 +231,12 @@ def compute_net_worth(db: Session, member: str | None = None) -> dict:
             for k, v in sorted(s["buckets"].items(), key=lambda kv: -kv[1])
             if v > 0
         ],
-        "by_product": [{"label": k, "value_ils": round(v, 2)} for k, v in sorted(by_product.items(), key=lambda kv: -kv[1])],
+        "by_product": [
+            {"label": k, "value_ils": round(v, 2), "return": product_ret.get(k)}
+            for k, v in sorted(by_product.items(), key=lambda kv: -kv[1])
+        ],
+        "bucket_returns": bucket_ret,
+        "return_kinds": RETURN_KINDS,
         "breakdown": sorted(rows, key=lambda b: -b["value_ils"]),
     }
 

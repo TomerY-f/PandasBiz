@@ -197,3 +197,13 @@ export const monthLabel = (m: string) => {
   const names = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳']
   return `${names[mm - 1]} ${String(y).slice(2)}`
 }
+
+// ---------- returns next to asset values ----------
+
+export interface AssetReturn { pct: number; kind: 'ytd' | 'since_purchase' | 'value_change' }
+
+/** marker shown after the % so each number says what kind of return it is (explained in a footnote) */
+export const RETURN_MARK: Record<AssetReturn['kind'], string> = { ytd: '', since_purchase: '*', value_change: '†' }
+
+export const fmtReturn = (r: AssetReturn | null | undefined) =>
+  r == null ? '' : `${r.pct > 0 ? '+' : ''}${r.pct.toFixed(2)}%${RETURN_MARK[r.kind]}`
