@@ -318,6 +318,17 @@ def write_pension_report(db: Session, parsed: dict, member_id: int | None) -> di
         db.flush()
         upsert_snapshot(db, account, as_of, p["balance"], note="מדוח מסלקה")
         db.flush()
+    for y in parsed.get("yields", []):
+        # the product list names the type by its short form ("קופת גמל"), the yield table by its full name
+        account = next(
+            (a for a in db.scalars(select(Account).where(Account.product == "pension", Account.external_ref.like(f"{y['policy_number']}:%")))
+             if y["type_name"].startswith(a.external_ref.split(":", 1)[1])),
+            None,
+        )
+        prod = db.scalar(select(PensionProduct).where(PensionProduct.account_id == account.id)) if account else None
+        if prod:
+            prod.yields = json.dumps({"as_of": y["as_of"], "tracks": y["tracks"]}, ensure_ascii=False)
+    db.flush()
     report = db.scalar(
         select(PensionReport).where(PensionReport.member_id == owner_id) if owner_id
         else select(PensionReport).where(PensionReport.client_name == parsed["client"])

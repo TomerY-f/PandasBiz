@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { apiGet, apiSend, fmtILS, fmtNum, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
 import { useMember } from '../components/MemberContext'
+import NetWorthChart from '../components/NetWorthChart'
 
 interface Bucket { key: string; label: string; group: 'liquid' | 'illiquid' | 'liability' }
 interface Totals {
@@ -157,17 +157,7 @@ export default function NetWorth() {
       {chart.length > 0 && (
         <div className="card">
           <h2>שווי נקי לאורך זמן</h2>
-          <ResponsiveContainer debounce={200} width="100%" height={280}>
-            <AreaChart data={chart}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} width={90} />
-              <Tooltip formatter={(v) => fmtILS(Number(v))} />
-              <Legend />
-              <Area type="monotone" dataKey="שווי נקי לפרישה" stroke="#6C5CE7" fill="#6C5CE7" fillOpacity={0.15} />
-              <Area type="monotone" dataKey="שווי נקי כולל" stroke="#00B894" fill="#00B894" fillOpacity={0.08} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <NetWorthChart history={data.history} />
           <div className="sheet-wrap">
             <table className="sheet">
               <thead>

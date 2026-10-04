@@ -118,6 +118,7 @@ def parse_pension_report(text: str) -> dict:
         "coverages": coverages,
         "mix": mix,
         "products": parse_products(text),
+        "yields": parse_yields(text),
     }
 
 
@@ -154,6 +155,59 @@ def parse_products(text: str) -> list[dict]:
             }
         )
     return products
+
+
+# Ministry of Finance returns per investment track, one table per product:
+# columns = last month, year to date, 12 months, 3 years, 5 years, 3-year average, 5-year average.
+YIELD_TABLE = "נתוני תשואה על פי דיווח משרד האוצר"
+YIELD_ROW = re.compile(r"₪\s*(\d{1,3}(?:,\d{3})*)(\d{1,3})%((?:-?\d+\.\d{2}%){1,7})")
+PRODUCT_HEAD = re.compile(r"\n\.?\d+(קרן[^\n]*|קופת גמל[^\n]*|ביטוח מנהלים[^\n]*)\n([^\n]+)\n([\d-]+)מספר פוליסה")
+
+
+def _yield_columns(values: list[float]) -> dict:
+    keys7 = ["last_month", "ytd", "y1", "y3", "y5", "y3_avg", "y5_avg"]
+    keys5 = ["last_month", "ytd", "y1", "y3", "y3_avg"]  # tracks younger than 5 years
+    keys3 = ["last_month", "ytd", "y1"]
+    keys = keys7 if len(values) == 7 else keys5 if len(values) == 5 else keys3[: len(values)]
+    return dict(zip(keys, values))
+
+
+def parse_yields(text: str) -> list[dict]:
+    out = []
+    starts = [m.start() for m in re.finditer(re.escape(YIELD_TABLE), text)]
+    for i, start in enumerate(starts):
+        end_candidates = [text.find(marker, start + 10) for marker in ("סוג כיסוי", "עמודהופק", YIELD_TABLE)]
+        end = min([e for e in end_candidates if e > 0] or [len(text)])
+        segment = text[start:end]
+        heads = list(PRODUCT_HEAD.finditer(text, 0, start))
+        if not heads:
+            continue
+        head = heads[-1]
+        as_of = None
+        m = re.search(r"(\d{2}/\d{2}/\d{4})נכון ל", text[head.end():start])
+        if m:
+            as_of = to_date(m.group(1))
+        body = segment.split("שנים\n")[-1] if "שנים\n" in segment else segment
+        tracks, prev = [], 0
+        for row in YIELD_ROW.finditer(body):
+            name = re.sub(r"\s+", " ", body[prev:row.start()]).strip(" -")
+            prev = row.end()
+            values = [float(v) for v in re.findall(r"(-?\d+\.\d{2})%", row.group(3))]
+            tracks.append({
+                "name": name or "מסלול",
+                "balance": _money(row.group(1)),
+                "share_pct": int(row.group(2)),
+                **_yield_columns(values),
+            })
+        if tracks:
+            out.append({
+                "type_name": head.group(1).strip(),
+                "provider": head.group(2).strip(),
+                "policy_number": head.group(3),
+                "as_of": as_of.isoformat() if as_of else None,
+                "tracks": tracks,
+            })
+    return out
 
 
 def report_as_of(parsed: dict) -> date:

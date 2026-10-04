@@ -220,6 +220,7 @@ def pension_by_member(db: Session, accounts: list[Account], members: dict[int, s
                 "salary": p.salary if p else 0.0,
                 "projected_pension": p.projected_pension if p else 0.0,
                 "last_deposit": p.last_deposit if p else "",
+                "yields": json.loads(p.yields) if p and p.yields else None,
             }
         )
     reports = {r.member_id: r for r in db.scalars(select(PensionReport))}

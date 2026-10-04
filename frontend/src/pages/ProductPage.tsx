@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react
 import { Bar, Cell, ComposedChart, Line, LineChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
 import { CHART_COLORS, apiGet, apiSend, fmtILS, fmtNum, memberQuery, withQuery } from '../api'
 import DropZone from '../components/DropZone'
+import YieldChart, { type YieldTrack } from '../components/YieldChart'
 import { useMember } from '../components/MemberContext'
 
 interface Tx {
@@ -72,6 +73,7 @@ interface PensionLine {
   salary: number
   projected_pension: number
   last_deposit: string
+  yields?: { as_of: string | null; tracks: YieldTrack[] } | null
 }
 interface PensionMember {
   member_id: number | null
@@ -837,6 +839,11 @@ function PensionMemberCard({ m }: { m: PensionMember }) {
           </tbody>
         </table>
       </div>
+      {m.products.some((p) => p.yields) && (
+        <YieldChart
+          products={m.products.filter((p) => p.yields).map((p) => ({ product: `${PENSION_TYPE[p.product_type] ?? ''} ${p.provider}`.trim(), as_of: p.yields!.as_of, tracks: p.yields!.tracks }))}
+        />
+      )}
     </div>
   )
 }

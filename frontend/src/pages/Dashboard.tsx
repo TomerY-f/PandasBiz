@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { CHART_COLORS, apiGet, fmtILS, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
 import { useMember } from '../components/MemberContext'
+import NetWorthChart, { type NetWorthPoint } from '../components/NetWorthChart'
 
 interface NW {
   current: {
@@ -16,7 +17,7 @@ interface NW {
     asset_map: { type: string; label: string; value_ils: number }[]
     by_product: { label: string; value_ils: number }[]
   }
-  history: { month: string; net_worth_retirement: number; net_worth_total: number }[]
+  history: NetWorthPoint[]
   years_of_living: number | null
 }
 interface Summary { month: string; income: number; needs: number; wants: number; expenses: number; balance: number; savings_rate: number | null }
@@ -105,17 +106,7 @@ export default function Dashboard() {
         {nw.history.length > 1 && (
           <div className="card">
             <h2>שווי נקי לאורך זמן</h2>
-            <ResponsiveContainer debounce={200} width="100%" height={260}>
-              <AreaChart data={nw.history.map((h) => ({ month: monthLabel(h.month), 'כולל': h.net_worth_total, 'לפרישה': h.net_worth_retirement }))}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} width={90} />
-                <Tooltip formatter={(v) => fmtILS(Number(v))} />
-                <Legend />
-                <Area type="monotone" dataKey="כולל" stroke="#00B894" fill="#00B894" fillOpacity={0.1} />
-                <Area type="monotone" dataKey="לפרישה" stroke="#6C5CE7" fill="#6C5CE7" fillOpacity={0.15} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <NetWorthChart history={nw.history} height={280} />
           </div>
         )}
         {c.by_product.length > 0 && (

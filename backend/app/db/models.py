@@ -131,6 +131,7 @@ class PensionProduct(Base):
     salary: Mapped[float] = mapped_column(Float, default=0.0)         # שכר למוצר
     projected_pension: Mapped[float] = mapped_column(Float, default=0.0)  # קצבה חזויה
     last_deposit: Mapped[str] = mapped_column(String, default="")
+    yields: Mapped[str] = mapped_column(Text, default="")  # JSON: per-track returns from the Ministry of Finance data
 
     account: Mapped["Account"] = relationship()
 
