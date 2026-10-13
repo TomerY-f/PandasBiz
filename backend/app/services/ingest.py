@@ -119,11 +119,39 @@ def upsert_snapshot(db: Session, account: Account, d: date, value: float, note: 
         db.add(AssetSnapshot(account_id=account.id, date=d, value=value, note=note))
 
 
+def known_sectors(db: Session) -> dict[str, str]:
+    """Merchant (normalized description) → the sector it had most often in earlier card files."""
+    from collections import Counter, defaultdict
+
+    counts: dict[str, Counter] = defaultdict(Counter)
+    for desc, sector in db.execute(
+        select(Transaction.description, Transaction.sector).where(Transaction.source == "credit", Transaction.sector != "")
+    ):
+        counts[merchant_key(desc)][sector] += 1
+    return {k: c.most_common(1)[0][0] for k, c in counts.items()}
+
+
+def merchant_key(description: str) -> str:
+    """'שופרסל שלי נורדאו' and 'שופרסל שלי נוה' → 'שופרסל שלי'; ignores branch suffixes, digits and spacing."""
+    words = re.sub(r"[\d\-_*/.,'\"()]+", " ", (description or "").upper()).split()
+    return " ".join(words[:2])
+
+
 def write_transactions(db: Session, account: Account, records: list[dict]) -> dict:
     existing = {h for (h,) in db.execute(select(Transaction.dedup_hash).where(Transaction.account_id == account.id))}
     cat = Categorizer(db)
+    usd_ils = get_usd_ils(db)
+    sectors = known_sectors(db) if any(r["source"] == "credit" and not r.get("sector") for r in records) else {}
     inserted = duplicates = 0
     for rec in records:
+        rec = dict(rec)
+        if rec.pop("charge_currency", None) == "USD":
+            rec["description"] = f"{rec['description']} (${abs(rec['amount']):,.2f})"
+            rec["amount"] = round(rec["amount"] * usd_ils, 2)
+            rec["category"] = rec.get("category", "")
+        if rec["source"] == "credit" and not rec.get("sector"):
+            # newer card exports leave out the merchant sector: reuse what this merchant had before
+            rec["sector"] = sectors.get(merchant_key(rec["description"]), "")
         if rec["dedup_hash"] in existing:
             duplicates += 1
             continue
@@ -431,6 +459,9 @@ def ingest_file(
         if result["loans"]:
             stats.update(write_loans(db, account, result["loans"]))
         snap = result["snapshot"]
+        if product == "credit_card" and any(t.get("charge_currency") == "USD" for t in result["transactions"]) and snap:
+            rate = get_usd_ils(db)
+            snap["value"] = round(sum(t["amount"] * (rate if t.get("charge_currency") == "USD" else 1) for t in result["transactions"]), 2)
         if snap and snap.get("value") is not None:
             upsert_snapshot(db, account, snap["date"], snap["value"], note=f"מקובץ {filename}")
             stats["snapshot"] = snap["value"]

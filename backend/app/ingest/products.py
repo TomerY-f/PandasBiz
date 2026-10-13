@@ -114,7 +114,7 @@ def parse_credit_card(filename: str, data: bytes) -> dict:
     if m:
         last4 = m.group(1)
     holder = ""
-    m = re.search(r"על שם\s+([^\d₪]+?)(?:\s{2,}|לחיוב|$)", top)
+    m = re.search(r"על שם\s+([^\d₪$]+?)(?:\s{2,}|לחיוב|\$|$)", top)
     if m:
         holder = m.group(1).strip()
     card_name = ""
@@ -128,6 +128,7 @@ def parse_credit_card(filename: str, data: bytes) -> dict:
     charge_col = _col(df, "סכום חיוב") or _col(df, "חיוב", exclude=("מטבע", "מועד", "תאריך")) or _col(df, "סכום")
     sector_col = _col(df, "ענף", "קטגוריה")
     voucher_col = _col(df, "שובר")
+    charge_cur_col = _col(df, "מטבע חיוב")
     if not date_col or not charge_col:
         return _result("credit_card", meta={"last4": last4, "holder": holder})
 
@@ -142,12 +143,14 @@ def parse_credit_card(filename: str, data: bytes) -> dict:
         voucher = _clean(row[voucher_col]) if voucher_col else ""
         key = (d, description, round(amount, 2), voucher)
         seen[key] += 1
-        txs.append(
-            _tx(
-                "credit", f"{last4}:{voucher}", d, description, -round(amount, 2), seen[key],
-                sector=_clean(row[sector_col]) if sector_col else "",
-            )
+        tx = _tx(
+            "credit", f"{last4}:{voucher}", d, description, -round(amount, 2), seen[key],
+            sector=_clean(row[sector_col]) if sector_col else "",
         )
+        # dollar-billed cards: the amount is in USD; ingest converts it to ILS at the stored rate
+        if charge_cur_col and _clean(row[charge_cur_col]) in ("$", "USD", "דולר"):
+            tx["charge_currency"] = "USD"
+        txs.append(tx)
 
     # upcoming charge = liability until paid
     total = None

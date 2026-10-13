@@ -143,6 +143,7 @@ RULES = [
     ("נע-קניה", SECURITIES_LINE, "", 50),
     ("נע-מכירה", SECURITIES_LINE, "", 50),
     ("רכישת מטח", INTERNAL_TRANSFER, "", 50),
+    ("חיוב ממועד קודם", INTERNAL_TRANSFER, "", 70),  # card line repeating last statement: already counted
     ("הע.מטח", INTERNAL_TRANSFER, "", 50),
     ("פיקדון", INTERNAL_TRANSFER, "", 30),
     # housing
