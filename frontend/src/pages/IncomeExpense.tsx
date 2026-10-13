@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { apiGet, apiSend, fmtILS, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
+import CashflowSummary from '../components/CashflowSummary'
 import { useMember } from '../components/MemberContext'
 
 interface Line {
@@ -137,6 +138,7 @@ export default function IncomeExpense() {
             <Bar dataKey="רצונות" stackId="e" fill="#FDCB6E" />
           </BarChart>
         </ResponsiveContainer>
+            <CashflowSummary rows={sheet.summary} />
       </div>
 
       <div className="card">

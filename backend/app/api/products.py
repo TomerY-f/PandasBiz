@@ -277,6 +277,19 @@ def delete_policy(policy_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@router.get("/products/trading/returns")
+def trading_returns(member: str | None = None, db: Session = Depends(get_db)):
+    """YTD and monthly returns of the self-directed trading holdings (market data, cached daily)."""
+    from ..services.market import monthly_returns
+
+    accounts = [a for a in db.scalars(select(Account).where(Account.product == "trading")) if _member_ok(a.owner_id, member)]
+    holdings = [h for a in accounts for h in a.holdings]
+    try:
+        return monthly_returns(db, holdings)
+    except Exception as e:  # no network etc.
+        raise HTTPException(502, f"לא ניתן למשוך נתוני שוק: {e}")
+
+
 @router.get("/documents/{doc_id}/file")
 def document_file(doc_id: int, db: Session = Depends(get_db)):
     d = db.get(Document, doc_id)

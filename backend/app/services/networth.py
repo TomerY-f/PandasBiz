@@ -96,7 +96,14 @@ def account_values(db: Session, accounts: list[Account], at: date | None = None)
                 parts[h.asset_class or account_bucket(a, v)] += v
         else:
             past = [s for s in snaps if s.date <= at_date]
-            if past:
+            future = [s for s in snaps if s.date > at_date]
+            if past and future and at is not None and a.product == "real_estate":
+                # a property's value moves gradually: spread a revaluation over the months between two values
+                p0, p1 = past[-1], future[0]
+                frac = (at_date - p0.date).days / max((p1.date - p0.date).days, 1)
+                v = snapshot_value(p0, a, usd_ils) + frac * (snapshot_value(p1, a, usd_ils) - snapshot_value(p0, a, usd_ils))
+                parts[account_bucket(a, v)] += v
+            elif past:
                 v = snapshot_value(past[-1], a, usd_ils)
                 parts[account_bucket(a, v)] += v
             elif at is not None and snaps:

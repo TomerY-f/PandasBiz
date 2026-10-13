@@ -69,3 +69,64 @@ def refresh_prices(db: Session) -> dict:
 
     db.commit()
     return {"updated": sorted(set(updated)), "failed": sorted(set(failed)), "usd_ils": usd_ils or get_usd_ils(db)}
+
+
+def monthly_returns(db: Session, holdings: list) -> dict:
+    """Year-to-date and month-by-month price returns of the current holdings (USD tickers),
+    from monthly closes; the portfolio figure weights each holding by its current value.
+    Cached per day in the settings table."""
+    import json
+    from datetime import date
+
+    tickers = sorted({h.symbol for h in holdings if (h.currency or "").upper() == "USD" and h.symbol.isascii() and h.symbol.isalpha()})
+    if not tickers:
+        return {"months": [], "holdings": [], "portfolio": None}
+    key = f"returns:{date.today().isoformat()}:{','.join(tickers)}"
+    cached = db.get(Setting, key)
+    if cached:
+        closes = json.loads(cached.value)
+    else:
+        import yfinance as yf
+
+        start = date(date.today().year - 1, 12, 1).isoformat()
+        data = yf.download(" ".join(tickers), start=start, interval="1mo", progress=False, auto_adjust=True)
+        close = data["Close"] if len(tickers) > 1 else data[["Close"]].rename(columns={"Close": tickers[0]})
+        closes = {
+            t: {idx.strftime("%Y-%m"): round(float(v), 4) for idx, v in close[t].dropna().items()}
+            for t in tickers if t in close
+        }
+        _set_setting(db, key, json.dumps(closes))
+        db.commit()
+    year = date.today().year
+    months = sorted({m for c in closes.values() for m in c if m.startswith(str(year))})
+    usd_ils = get_usd_ils(db)
+    rows, weights = [], {}
+    for h in holdings:
+        c = closes.get(h.symbol)
+        if not c:
+            continue
+        base = c.get(f"{year - 1}-12")
+        monthly = {}
+        prev = base
+        for m in months:
+            if m in c and prev:
+                monthly[m] = round((c[m] / prev - 1) * 100, 2)
+            prev = c.get(m, prev)
+        last = c.get(months[-1]) if months else None
+        ytd = round((last / base - 1) * 100, 2) if base and last else None
+        value = h.quantity * (h.last_price or 0) * usd_ils
+        weights[h.symbol] = value
+        rows.append({"symbol": h.symbol, "name": h.name, "value_ils": round(value, 2), "ytd": ytd, "monthly": monthly})
+    total = sum(weights.values()) or 1
+
+    def wavg(get):
+        vals = [(get(r), weights[r["symbol"]]) for r in rows if get(r) is not None]
+        w = sum(x[1] for x in vals)
+        return round(sum(v * x for v, x in vals) / w, 2) if w else None
+
+    portfolio = {
+        "ytd": wavg(lambda r: r["ytd"]),
+        "monthly": {m: wavg(lambda r, m=m: r["monthly"].get(m)) for m in months},
+        "weights": {r["symbol"]: round(weights[r["symbol"]] / total * 100, 1) for r in rows},
+    }
+    return {"months": months, "holdings": rows, "portfolio": portfolio}

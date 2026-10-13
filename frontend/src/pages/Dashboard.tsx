@@ -4,6 +4,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { type AssetReturn, CHART_COLORS, apiGet, fmtReturn, fmtILS, fmtPct, memberQuery, monthLabel, withQuery } from '../api'
+import CashflowSummary from '../components/CashflowSummary'
 import { useMember } from '../components/MemberContext'
 import NetWorthChart, { type NetWorthPoint } from '../components/NetWorthChart'
 
@@ -84,6 +85,7 @@ export default function Dashboard() {
                 <Bar dataKey="רצונות" stackId="e" fill="#FDCB6E" />
               </BarChart>
             </ResponsiveContainer>
+            <CashflowSummary rows={summary} />
           </div>
         )}
         {c.asset_map.length > 0 && (

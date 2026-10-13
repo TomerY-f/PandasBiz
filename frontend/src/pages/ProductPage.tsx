@@ -3,6 +3,7 @@ import { Bar, Cell, ComposedChart, Line, LineChart, CartesianGrid, Pie, PieChart
 import { CHART_COLORS, apiGet, apiSend, fmtILS, fmtNum, memberQuery, withQuery } from '../api'
 import DropZone from '../components/DropZone'
 import YieldChart, { type YieldTrack } from '../components/YieldChart'
+import TradingReturns from '../components/TradingReturns'
 import { useMember } from '../components/MemberContext'
 
 interface Tx {
@@ -223,6 +224,9 @@ export default function ProductPage({ product, title, hint, children, upload = t
       {data?.transactions && <Transactions txs={data.transactions} lines={lines} product={product} onChange={load} />}
       {data?.holdings && data.holdings.length > 0 && (
         <Holdings rows={data.holdings} usdIls={data.usd_ils} onRefresh={product === 'fx' ? undefined : refreshPrices} onChange={load} />
+      )}
+      {product === 'trading' && data?.holdings && data.holdings.length > 0 && (
+        <TradingReturns member={member} />
       )}
       {data?.loans && data.loans.length > 0 && <Loans rows={data.loans} total={data.monthly_payment_total ?? 0} />}
       {data?.pension_members && data.pension_members.map((m) => <PensionMemberCard key={m.member} m={m} />)}
@@ -570,6 +574,11 @@ const CLASS_LABELS: Record<string, string> = { cash: 'מזומן', deposits: 'ק
 
 function Holdings({ rows, usdIls, onRefresh, onChange }: { rows: HoldingRow[]; usdIls: number; onRefresh?: () => void; onChange: () => void }) {
   const total = rows.reduce((s, h) => s + h.value_ils, 0)
+  // total gain / loss in ILS over holdings with a known cost (cash rows have none)
+  const rate = (h: HoldingRow) => (h.currency === 'USD' ? usdIls : 1)
+  const withCost = rows.filter((h) => h.gain_native != null && h.cost_basis)
+  const gainIls = withCost.reduce((s, h) => s + (h.gain_native ?? 0) * rate(h), 0)
+  const costIls = withCost.reduce((s, h) => s + h.cost_basis * rate(h), 0)
   const setClass = async (id: number, value: string) => {
     await apiSend('PATCH', `/holdings/${id}/class`, { asset_class: value })
     onChange()
@@ -604,7 +613,14 @@ function Holdings({ rows, usdIls, onRefresh, onChange }: { rows: HoldingRow[]; u
                 </td>
               </tr>
             ))}
-            <tr className="total"><td><b>סה"כ</b></td><td /><td /><td /><td><b>{fmtILS(total)}</b></td><td /><td /></tr>
+            <tr className="total">
+              <td><b>סה"כ</b></td><td /><td /><td /><td><b>{fmtILS(total)}</b></td>
+              <td className={gainIls >= 0 ? 'pos' : 'neg'}>
+                <b>{gainIls >= 0 ? '+' : '−'}{fmtILS(Math.abs(gainIls))}</b>
+                {costIls ? <span> ({gainIls >= 0 ? '+' : ''}{fmtNum((gainIls / costIls) * 100, 2)}%)</span> : null}
+              </td>
+              <td />
+            </tr>
           </tbody>
         </table>
         <ResponsiveContainer debounce={200} width="100%" height={220}>
