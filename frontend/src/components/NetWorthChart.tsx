@@ -5,6 +5,7 @@ import { fmtILS, monthLabel } from '../api'
 export interface NetWorthPoint {
   month: string
   liquid: number
+  liquid_net: number
   illiquid: number
   liabilities: number
   net_worth_retirement: number
@@ -23,6 +24,7 @@ const SERIES = [
   { key: 'net_worth_total', label: 'שווי נקי כולל', color: '#00B894', width: 3 },
   { key: 'net_worth_retirement', label: 'שווי נקי לפרישה מוקדמת', color: '#6C5CE7', width: 3 },
   { key: 'liquid', label: 'הון נזיל', color: '#0984E3', width: 2 },
+  { key: 'liquid_net', label: 'הון נזיל נטו (אחרי חובות אשראי)', color: '#00CEC9', width: 2 },
   { key: 'illiquid', label: 'הון לא נזיל', color: '#E17055', width: 2 },
 ] as const
 

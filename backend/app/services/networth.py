@@ -56,9 +56,14 @@ def snapshot_value(snap: AssetSnapshot, account: Account, usd_ils: float) -> flo
 
 
 def card_value_at(snaps: list[AssetSnapshot], at: date) -> float:
-    """A card statement is a liability from its purchases until its charge date (the snapshot date)."""
-    upcoming = [s for s in snaps if s.date >= at and (s.date - at).days <= 45]
+    """The next card statement (charged within a month after `at`) is a liability until its charge date.
+    A 45-day window used to also pick up the statement after that for cards whose earlier statements were
+    missing, so month-end card debt jumped around (e.g. July looked ₪28K more indebted than August)."""
+    upcoming = [s for s in snaps if s.date >= at and (s.date - at).days <= 31]
     return min(upcoming, key=lambda s: s.date).value if upcoming else 0.0
+
+
+INVESTMENT_DEPOSIT_LINE = "הפקדות לתיק ההשקעות"
 
 
 def bank_flows(db: Session) -> dict[str, list[Transaction]]:
@@ -67,6 +72,8 @@ def bank_flows(db: Session) -> dict[str, list[Transaction]]:
     return {
         "bank_securities": [t for t in txs if t.category == SECURITIES_LINE],
         "fx": [t for t in txs if t.category == INTERNAL_TRANSFER and "מטח" in (t.description or "")],
+        # money sent to the self-directed trading account
+        "trading": [t for t in txs if t.category == INVESTMENT_DEPOSIT_LINE],
     }
 
 
@@ -148,6 +155,8 @@ def summarize(rows: list[dict]) -> dict:
         "liabilities": round(groups["liability"], 2),
         "net_worth_retirement": round(groups["liquid"] + groups["liability"], 2),
         "net_worth_total": round(groups["liquid"] + groups["illiquid"] + groups["liability"], 2),
+        # liquid assets minus short-term debt (card charges not yet paid, overdraft): moves with the monthly cash flow
+        "liquid_net": round(groups["liquid"] + buckets.get("credit_cards", 0.0) + buckets.get("overdraft", 0.0), 2),
     }
 
 

@@ -7,6 +7,7 @@ interface Bucket { key: string; label: string; group: 'liquid' | 'illiquid' | 'l
 interface Totals {
   buckets: Record<string, number>
   liquid: number
+  liquid_net: number
   illiquid: number
   liabilities: number
   net_worth_retirement: number
