@@ -31,8 +31,11 @@ const SERIES = [
 /** Net worth over time with stock-chart style range tabs (YTD by default) and liquid / illiquid capital curves. */
 export default function NetWorthChart({ history, height = 300 }: { history: NetWorthPoint[]; height?: number }) {
   const [range, setRange] = useState<Range>('YTD')
-  // clicking a legend label shows only that curve (and rescales to it); clicking it again shows all
-  const [only, setOnly] = useState<string | null>(null)
+  // legend labels toggle curves on and off; the scale fits the curves shown. Empty selection = all curves.
+  const [selected, setSelected] = useState<string[]>([])
+  const shownSet = (label: string) => selected.length === 0 || selected.includes(label)
+  const toggle = (label: string) =>
+    setSelected((cur) => (cur.includes(label) ? cur.filter((x) => x !== label) : [...cur, label]))
   if (!history.length) return null
   const last = history[history.length - 1].month
   const [y, m] = last.split('-').map(Number)
@@ -58,7 +61,7 @@ export default function NetWorthChart({ history, height = 300 }: { history: NetW
         <span className="muted">
           שינוי בשווי הנקי הכולל בטווח: <b className={change >= 0 ? 'pos' : 'neg'}>{change >= 0 ? '+' : '−'}{fmtILS(Math.abs(change))}</b>
           {history[0].month > startMonth && <> · יש נתונים רק מ-{monthLabel(history[0].month)}</>}
-          {' · '}{only ? <>מוצג רק "{only}" (לחיצה נוספת על המקרא מחזירה הכל)</> : 'לחיצה על שם במקרא מציגה רק אותו'}
+          {' · '}{selected.length ? <>מוצגים {selected.length} גרפים · <a href="#" onClick={(e) => { e.preventDefault(); setSelected([]) }}>הצג הכל</a></> : 'לחיצה על שמות במקרא בוחרת אילו גרפים להציג (אפשר כמה)'}
         </span>
         <div className="range-tabs">
           {RANGES.map((r) => (
@@ -74,13 +77,15 @@ export default function NetWorthChart({ history, height = 300 }: { history: NetW
             tickFormatter={(v) => `₪${(Number(v) / 1e6).toFixed(Math.abs(Number(v)) < 1e6 ? 2 : 1)}M`} />
           <Tooltip formatter={(v) => fmtILS(Number(v))} />
           <Legend
-            onClick={(e) => { const k = String((e as { dataKey?: unknown }).dataKey ?? e.value); setOnly((cur) => (cur === k ? null : k)) }}
+            onClick={(e) => toggle(String((e as { dataKey?: unknown }).dataKey ?? e.value))}
             formatter={(value) => (
-              <span style={{ cursor: 'pointer', opacity: only && only !== value ? 0.4 : 1, fontWeight: only === value ? 700 : 400 }}>{value}</span>
+              <span style={{ cursor: 'pointer', opacity: shownSet(String(value)) ? 1 : 0.4, fontWeight: selected.includes(String(value)) ? 700 : 400 }}>
+                {selected.includes(String(value)) ? '✓ ' : ''}{value}
+              </span>
             )}
           />
           {SERIES.map((s) => (
-            <Line key={s.key} type="monotone" dataKey={s.label} stroke={s.color} strokeWidth={s.width} hide={only != null && only !== s.label} dot={data.length < 16 ? { r: 3 } : false} isAnimationActive={false} />
+            <Line key={s.key} type="monotone" dataKey={s.label} stroke={s.color} strokeWidth={s.width} hide={!shownSet(s.label)} dot={data.length < 16 ? { r: 3 } : false} isAnimationActive={false} />
           ))}
         </LineChart>
       </ResponsiveContainer>
