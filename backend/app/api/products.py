@@ -155,6 +155,8 @@ def product_summary(product: str, member: str | None = None, db: Session = Depen
                 "id": l.id, "name": l.name, "original_amount": l.original_amount, "balance": l.balance,
                 "rate_text": l.rate_text, "monthly_payment": l.monthly_payment, "payments_left": l.payments_left,
                 "end_date": l.end_date.isoformat() if l.end_date else None, "as_of": l.as_of.isoformat() if l.as_of else None,
+                "loan_ref": l.loan_ref, "track_type": l.track_type, "prepay_fee": l.prepay_fee,
+                "start_date": l.start_date.isoformat() if l.start_date else None,
             }
             for l in loans
         ]

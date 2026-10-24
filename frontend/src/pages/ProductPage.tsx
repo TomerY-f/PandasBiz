@@ -43,6 +43,8 @@ interface LoanRow {
   monthly_payment: number
   payments_left: string
   end_date: string | null
+  track_type: string
+  prepay_fee: number
 }
 interface Policy {
   id: number
@@ -639,19 +641,25 @@ function Holdings({ rows, usdIls, onRefresh, onChange }: { rows: HoldingRow[]; u
 
 function Loans({ rows, total }: { rows: LoanRow[]; total: number }) {
   const balance = rows.reduce((s, l) => s + l.balance, 0)
+  const fees = rows.reduce((s, l) => s + (l.prepay_fee || 0), 0)
+  const hasTrack = rows.some((l) => l.track_type)
+  const avgRate = balance ? rows.reduce((s, l) => s + l.balance * (parseFloat(l.rate_text.split(' ').pop() || '') || 0), 0) / balance : 0
   return (
     <div className="card">
       <h2>מסלולים / הלוואות</h2>
       <div className="kpi-grid">
         <div className="stat"><div className="label">יתרת חוב</div><div className="value neg">{fmtILS(balance)}</div></div>
         <div className="stat"><div className="label">החזר חודשי</div><div className="value">{fmtILS(total)}</div></div>
+        {avgRate > 0 && <div className="stat"><div className="label">ריבית משוקללת</div><div className="value">{avgRate.toFixed(2)}%</div></div>}
+        {fees > 0 && <div className="stat"><div className="label">עמלות פירעון מוקדם</div><div className="value">{fmtILS(fees)}</div></div>}
       </div>
       <table>
-        <thead><tr><th>שם</th><th>סכום מקורי</th><th>יתרת חוב</th><th>% מהחוב</th><th>ריבית</th><th>תשלום חודשי</th><th>תשלומים</th><th>פירעון סופי</th></tr></thead>
+        <thead><tr><th>שם</th>{hasTrack && <th>מסלול</th>}<th>סכום מקורי</th><th>יתרת חוב</th><th>% מהחוב</th><th>ריבית</th><th>תשלום חודשי</th><th>תשלומים</th><th>פירעון סופי</th>{hasTrack && <th>עמלת פירעון</th>}</tr></thead>
         <tbody>
           {rows.map((l) => (
             <tr key={l.id}>
               <td>{l.name}</td>
+              {hasTrack && <td>{l.track_type}</td>}
               <td>{fmtILS(l.original_amount)}</td>
               <td className="neg">{fmtILS(l.balance)}</td>
               <td>{balance ? `${Math.round((l.balance / balance) * 100)}%` : ''}</td>
@@ -659,6 +667,7 @@ function Loans({ rows, total }: { rows: LoanRow[]; total: number }) {
               <td>{fmtILS(l.monthly_payment, 2)}</td>
               <td>{l.payments_left}</td>
               <td>{l.end_date ?? ''}</td>
+              {hasTrack && <td>{l.prepay_fee ? fmtILS(l.prepay_fee) : '—'}</td>}
             </tr>
           ))}
         </tbody>

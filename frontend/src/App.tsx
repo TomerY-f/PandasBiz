@@ -26,7 +26,7 @@ const PRODUCTS: { key: string; path: string; label: string; hint: string }[] = [
   { key: 'trading', path: '/p/trading', label: 'מסחר עצמאי', hint: 'תיק סוף יום מבית ההשקעות (xlsx)' },
   { key: 'pension', path: '/p/pension', label: 'פנסיה והשתלמות', hint: 'דוח מסלקה פנסיונית (PDF, גם מוגן בסיסמה) לכל בן משפחה' },
   { key: 'insurance', path: '/p/insurance', label: 'ביטוחים', hint: 'ייצוא מהר הביטוח (xlsx). פוליסות PDF נשמרות כמסמך' },
-  { key: 'mortgage', path: '/p/mortgage', label: 'משכנתא', hint: 'פירוט המשכנתאות (xlsx). דוחות PDF נשמרים כמסמך' },
+  { key: 'mortgage', path: '/p/mortgage', label: 'משכנתא', hint: 'פירוט המשכנתאות (xlsx) או דוח יתרה לסילוק (PDF)' },
   { key: 'real_estate', path: '/p/realestate', label: 'נדל"ן', hint: 'נסחי טאבו / שמאות (PDF) נשמרים כמסמך; שווי מעדכנים ידנית' },
 ]
 

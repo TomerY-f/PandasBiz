@@ -16,6 +16,7 @@ from ..db.models import (
 )
 from ..ingest import etrade
 from ..ingest.detect import detect_kind
+from ..ingest.mortgage_report import is_mortgage_report, parse_mortgage_report
 from ..ingest.pension_report import PdfPasswordError, is_pension_report, parse_pension_report, pdf_text, report_as_of
 from ..ingest.products import parse_file
 from .categorize import Categorizer
@@ -200,17 +201,23 @@ def holdings_value_ils(db: Session, records: list[dict]) -> float:
     return round(total, 2)
 
 
+LOAN_FIELDS = (
+    "name", "original_amount", "balance", "rate_text", "monthly_payment", "payments_left", "end_date", "as_of",
+    "loan_ref", "track_type", "start_date", "prepay_fee",
+)
+
+
 def write_loans(db: Session, account: Account, records: list[dict]) -> dict:
+    """Replaces the account's loans. Fields a file doesn't carry (e.g. end date and prepayment fee are only in
+    the payoff PDF, not the XLSX) are kept from the previous row of the same loan (same original amount)."""
+    old = {l.original_amount: l for l in db.scalars(select(Loan).where(Loan.account_id == account.id))}
     db.execute(delete(Loan).where(Loan.account_id == account.id))
     for rec in records:
-        db.add(
-            Loan(
-                account_id=account.id,
-                **{k: rec.get(k) for k in (
-                    "name", "original_amount", "balance", "rate_text", "monthly_payment", "payments_left", "end_date", "as_of",
-                )},
-            )
-        )
+        prev = old.get(rec.get("original_amount"))
+        values = {k: rec.get(k) for k in LOAN_FIELDS}
+        if prev:
+            values.update({k: getattr(prev, k) for k, v in values.items() if v is None})
+        db.add(Loan(account_id=account.id, **{k: v for k, v in values.items() if v is not None}))
     return {"loans": len(records)}
 
 
@@ -383,6 +390,7 @@ def ingest_file(
 ) -> dict:
     """Parses and stores one uploaded file. Caller commits. `password` opens protected PDFs and is never stored."""
     lower = filename.lower()
+    result = None
     if lower.endswith(".pdf"):
         try:
             text = pdf_text(data, password)
@@ -401,14 +409,16 @@ def ingest_file(
             owner = db.get(FamilyMember, owner_id) if owner_id else None
             return {"file": filename, "product": "pension", "product_label": PRODUCTS["pension"][0],
                     "owner": owner.name if owner else None, "document_id": doc.id, **stats}
-    if lower.endswith((".pdf", ".png", ".jpg", ".jpeg")):
+        if is_mortgage_report(text):
+            result = parse_mortgage_report(data, password)
+    if result is None and lower.endswith((".pdf", ".png", ".jpg", ".jpeg")):
         product = product_hint or "manual"
         doc = store_document(db, product, filename, data, member_id, account_id, parsed=False, summary="מסמך שמור (ללא פענוח)")
         db.flush()
         return {"file": filename, "product": product, "document_id": doc.id, "stored_only": True}
 
     try:
-        result = parse_file(filename, data, product_hint)
+        result = result or parse_file(filename, data, product_hint)
     except ValueError:
         if detect_kind(filename, data) == "etrade":
             recs = etrade.parse(filename, data)

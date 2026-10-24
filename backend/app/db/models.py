@@ -284,6 +284,10 @@ class Loan(Base):
     payments_left: Mapped[str] = mapped_column(String, default="")  # e.g. "44/300"
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     as_of: Mapped[date | None] = mapped_column(Date, nullable=True)
+    loan_ref: Mapped[str] = mapped_column(String, default="")    # bank's loan number
+    track_type: Mapped[str] = mapped_column(String, default="")  # פריים / קבועה, צמודה / ...
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    prepay_fee: Mapped[float] = mapped_column(Float, default=0.0)  # early-repayment fee per the bank's payoff report
 
     account: Mapped["Account"] = relationship()
 
