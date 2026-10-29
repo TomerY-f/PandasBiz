@@ -1,4 +1,5 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { MemberProvider, MemberSelect } from './components/MemberContext'
 import BankPage from './pages/BankPage'
 import Budget from './pages/Budget'
@@ -31,10 +32,21 @@ const PRODUCTS: { key: string; path: string; label: string; hint: string }[] = [
 ]
 
 export default function App() {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const location = useLocation()
+  useEffect(() => setMenuOpen(false), [location.pathname])  // picking a page closes the menu
   return (
     <MemberProvider>
       <div className="layout">
-        <nav className="sidebar">
+        {/* phones: a top bar with a ☰ button opens the menu as a drawer */}
+        <header className="topbar">
+          <button className="hamburger" aria-label="תפריט" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+            {menuOpen ? '✕' : '☰'}
+          </button>
+          <div className="brand">🐼 PandasBiz</div>
+        </header>
+        {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
+        <nav className={`sidebar ${menuOpen ? 'open' : ''}`}>
           <div className="brand">🐼 PandasBiz</div>
           <MemberSelect />
           <div className="section">גיליונות</div>
