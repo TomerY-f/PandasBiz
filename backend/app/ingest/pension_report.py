@@ -53,7 +53,7 @@ def parse_pension_report(text: str) -> dict:
     if m:
         client = m.group(1).strip()
     report_date = None
-    m = re.search(r"דוח מיום\s*\n\s*(\d{2}/\d{2}/\d{4})", text)
+    m = re.search(r"דוח (?:מיום|נכון ליום)\s*\n\s*(\d{2}/\d{2}/\d{4})", text)
     if m:
         report_date = to_date(m.group(1))
 
@@ -117,6 +117,8 @@ def parse_pension_report(text: str) -> dict:
         "pension": pension,
         "coverages": coverages,
         "mix": mix,
+        # "דוח מצב טרום טיפול" is a snapshot before the agent moved funds; "דוח שוטף" is the current state
+        "pre_treatment": "טרום טיפול" in text,
         "products": parse_products(text),
         "yields": parse_yields(text),
     }

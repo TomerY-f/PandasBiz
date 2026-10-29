@@ -19,7 +19,7 @@ echo "Starting web app..."
 
 echo -n "Waiting for the app to come up (first start after OneDrive sync can take a minute)"
 for i in {1..90}; do
-  if curl -s -m 2 http://localhost:5173/api/health | grep -q ok; then
+  if curl -s -m 2 http://127.0.0.1:8000/api/health | grep -q ok; then
     echo " ready."
     open "http://localhost:5173"
     exit 0

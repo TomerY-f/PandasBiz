@@ -353,6 +353,25 @@ def write_pension_report(db: Session, parsed: dict, member_id: int | None) -> di
         db.flush()
         upsert_snapshot(db, account, as_of, p["balance"], note="מדוח מסלקה")
         db.flush()
+    # funds moved to another manager: a newer report lists, say, the study funds at the new manager only.
+    # Accounts of the same product types that this report no longer lists are closed at its date (value 0),
+    # so the money is not counted twice. Types the report does not cover at all (e.g. pension funds) stay.
+    if owner_id and not parsed.get("pre_treatment"):  # only a current-state report can close funds
+        refs_now = {f"{p['policy_number']}:{p['type_name']}" for p in parsed["products"]}
+        types_now = {p["product_type"] for p in parsed["products"]}
+        for acc in db.scalars(select(Account).where(Account.product == "pension", Account.owner_id == owner_id)):
+            prod = db.scalar(select(PensionProduct).where(PensionProduct.account_id == acc.id))
+            if not prod or acc.external_ref in refs_now or prod.product_type not in types_now:
+                continue
+            last = db.scalar(select(AssetSnapshot).where(AssetSnapshot.account_id == acc.id).order_by(AssetSnapshot.date.desc()).limit(1))
+            if last and last.value:
+                from datetime import timedelta
+
+                close_on = as_of if last.date < as_of else last.date + timedelta(days=1)
+                upsert_snapshot(db, acc, close_on, 0.0, note="הועבר / נסגר לפי דוח חדש")
+                prod.status = "הועבר"
+        db.flush()
+
     for y in parsed.get("yields", []):
         # the product list names the type by its short form ("קופת גמל"), the yield table by its full name
         account = next(
@@ -373,14 +392,21 @@ def write_pension_report(db: Session, parsed: dict, member_id: int | None) -> di
         db.add(report)
     if report.report_date and parsed["report_date"] and report.report_date > parsed["report_date"]:
         return {"products": len(parsed["products"]), "snapshot": parsed["total"]}  # an older report: keep the newer summary
+    # a partial report (e.g. a "דוח שוטף" covering only the funds the agent manages) must not replace the
+    # member's full summary: keep earlier deposits / projected pension / coverages / return where it has none.
+    old = json.loads(report.data or "{}")
+    partial = bool(report.total_savings) and parsed["total"] < 0.6 * report.total_savings
+    new = {k: parsed[k] for k in ("deposits", "pension", "coverages", "mix")}
+    for k, v in new.items():
+        if isinstance(v, dict) and not any(v.values()) and old.get(k):
+            new[k] = old[k]
     report.client_name = parsed["client"]
-    report.report_date = parsed["report_date"]
-    report.total_savings = parsed["total"]
-    report.ytd_return_pct = parsed["ytd_return"]
-    report.monthly_premium = parsed["monthly_premium"]
-    report.data = json.dumps(
-        {k: parsed[k] for k in ("deposits", "pension", "coverages", "mix")}, ensure_ascii=False
-    )
+    report.report_date = parsed["report_date"] or report.report_date
+    if not partial:
+        report.total_savings = parsed["total"]
+        report.ytd_return_pct = parsed["ytd_return"]
+        report.monthly_premium = parsed["monthly_premium"] or report.monthly_premium
+    report.data = json.dumps(new, ensure_ascii=False)
     return {"products": len(parsed["products"]), "snapshot": parsed["total"], "owner_id": owner_id}
 
 

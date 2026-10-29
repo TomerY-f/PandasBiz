@@ -229,7 +229,8 @@ def pension_by_member(db: Session, accounts: list[Account], members: dict[int, s
     out = []
     for owner_id in sorted(by_owner, key=lambda o: (o is None, o or 0)):
         r = reports.get(owner_id)
-        products = sorted(by_owner[owner_id], key=lambda x: -x["balance"])
+        # funds closed or moved to another manager (balance 0) are not listed
+        products = sorted([x for x in by_owner[owner_id] if x["balance"] or x["status"] != "הועבר"], key=lambda x: -x["balance"])
         out.append(
             {
                 "member_id": owner_id,

@@ -10,6 +10,7 @@ Layout (all inside the inbox folder):
 Imported files are moved into the archive folder (the PandasBiz input folder), by product.
 """
 import configparser
+import re
 import logging
 import os
 import shutil
@@ -130,7 +131,9 @@ def process_file(path: str, inbox: str, archive: str | None) -> None:
         if os.path.dirname(path) != inbox:  # dropped in a member sub-folder, e.g. <inbox>/מור/
             member = next((m for m in db.query(FamilyMember).all() if m.name == parent), None)
         res, error = None, None
-        for pw in keychain_passwords() or [None]:
+        # protected pension PDFs use the member's ID number as password; it may be in the file name
+        name_numbers = re.findall(r"(?<!\d)\d{8,9}(?!\d)", name)
+        for pw in name_numbers + keychain_passwords() or [None]:
             try:
                 res = ingest_file(db, name, data, member_id=member.id if member else None, password=pw)
                 db.commit()
@@ -138,7 +141,7 @@ def process_file(path: str, inbox: str, archive: str | None) -> None:
             except Exception as e:  # wrong password / unknown file: try the next password, then give up
                 db.rollback()
                 error = str(e)
-        if res is None and name.lower().endswith(".pdf") and not keychain_passwords():
+        if res is None and name.lower().endswith(".pdf") and not (keychain_passwords() or name_numbers):
             try:
                 res = ingest_file(db, name, data, member_id=member.id if member else None)
                 db.commit()
