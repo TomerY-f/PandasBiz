@@ -9,7 +9,7 @@ DATA=/tmp/findash_test_data
 rm -rf "$DB" "$DATA"
 
 .venv/bin/python tests/make_samples.py > /dev/null
-FINDASH_DB="$DB" FAMILYBIZ_DATA="$DATA" .venv/bin/uvicorn app.main:app --port $PORT > /tmp/uvicorn_test.log 2>&1 &
+PANDASBIZ_INBOX=0 FINDASH_DB="$DB" FAMILYBIZ_DATA="$DATA" .venv/bin/uvicorn app.main:app --port $PORT > /tmp/uvicorn_test.log 2>&1 &
 SERVER_PID=$!
 trap "kill $SERVER_PID 2>/dev/null" EXIT
 sleep 3

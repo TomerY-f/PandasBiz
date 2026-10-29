@@ -30,6 +30,21 @@ app.include_router(budget.router)
 app.include_router(dashboard.router)
 
 
+@app.on_event("startup")
+def _start_inbox():
+    # watches the iCloud Drive "PandasBiz Inbox" folder for files saved from the phone (event-driven, idle = no CPU)
+    from .services import inbox
+
+    inbox.start()
+
+
+@app.on_event("shutdown")
+def _stop_inbox():
+    from .services import inbox
+
+    inbox.stop()
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
